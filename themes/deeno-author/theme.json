@@ -1,0 +1,6 @@
+{
+    "name": "deeno-author",
+    "description": "Personal author blog in the deeno UI style: an author hero with bio and social links, a chronological timeline grouped by year, a tag cloud, reading time, dark mode and RU/EN.",
+    "version": "1.0",
+    "author": "deeno"
+}

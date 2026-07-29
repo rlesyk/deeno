@@ -23,9 +23,6 @@ $canEditSite = !empty($isSiteAdmin);
 
   <div class="filters">
     <button type="submit" class="btn btn--primary"><?= e(t('Сохранить настройки')) ?></button>
-    <?php if (defined('DEENO_VERSION')): ?>
-      <span class="settings__version">deeno <?= e(DEENO_VERSION) ?></span>
-    <?php endif; ?>
   </div>
 
   <?php

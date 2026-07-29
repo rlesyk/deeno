@@ -7,6 +7,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Two new blog themes** in the deeno UI house style (indigo accent, Inter,
+  hairlines, light/dark, RU/EN), each with a distinct idea and functionality:
+  - **deeno-mag** — an editorial magazine: a curated homepage with a featured
+    lead story pulled from sticky posts, per-category sections, reading time,
+    and a top category navigation.
+  - **deeno-author** — a personal author blog: an author hero with bio and
+    social links, a chronological timeline grouped by year, a tag cloud,
+    reading time, a drop-cap reading column, an author card and prev/next.
+
 - **Demo mode** (`"demo_mode": true` in the config) for public sandbox
   deployments. Server-side (not just in the UI) it locks the sandbox down so a
   stranger can explore the panel without defacing or abusing it: deleting

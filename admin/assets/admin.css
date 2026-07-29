@@ -363,8 +363,6 @@ a.sidebar__user:hover { color: var(--ink); }
 .card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .card__head .card__title { margin-bottom: 0; }
 .card__sub { margin: 2px 0 0; font-size: 12px; color: var(--fog); }
-/* Версия приложения справа в строке с кнопкой «Сохранить» (Настройки) */
-.settings__version { margin-left: auto; font-size: 12px; color: var(--fog); }
 /* Карточка с подписью-месяцем под заголовком (как «Просмотры»):
    подпись занимает место бывшего 16px-отступа заголовка — высота карточки не растёт */
 .card--sub-title .card__title { margin-bottom: 0; }

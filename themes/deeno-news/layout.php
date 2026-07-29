@@ -25,14 +25,10 @@ $navActive = function (string $url) use ($reqPath): bool {
     return $reqPath === $p || str_starts_with($reqPath, $p . '/');
 };
 
-// Язык интерфейса темы: кука deeno_lang (ru/en), иначе язык сайта из настроек.
-// Переключение локализует только строки самой темы; контент постов/страниц —
-// как написан автором (flat-file CMS хранит один язык контента).
-$lang = (string)($_COOKIE['deeno_lang'] ?? '');
-if (!in_array($lang, ['ru', 'en'], true)) {
-    $lang = str_starts_with(strtolower((string)$site->language), 'en') ? 'en' : 'ru';
-}
-$langTo = $lang === 'ru' ? 'en' : 'ru';
+// Язык интерфейса темы — по языку сайта (Настройки). Отдельного переключателя
+// в теме нет: локализуется всего пара слов, ради них тумблер не нужен. Контент
+// постов/страниц — как написан автором (flat-file CMS хранит один язык контента).
+$lang = str_starts_with(strtolower((string)$site->language), 'en') ? 'en' : 'ru';
 $trDict = [
     'Главная' => 'Home',
     'Рубрики' => 'Categories',
@@ -45,7 +41,6 @@ $trDict = [
     'Редактировать' => 'Edit',
     'Предпросмотр — материал ещё не опубликован' => 'Preview — not published yet',
     'Меню' => 'Menu',
-    'Язык' => 'Language',
     'Тема' => 'Theme',
     'Тег' => 'Tag',
     'Рубрика' => 'Category',
@@ -119,11 +114,6 @@ $tr = fn(string $s): string => $lang === 'en' ? ($trDict[$s] ?? $s) : $s;
                 title="<?= $e($tr('Тема')) ?>" aria-label="<?= $e($tr('Тема')) ?>">
           <svg class="theme-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
           <svg class="theme-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-        </button>
-        <button type="button" class="side__lang" id="lang-toggle" data-lang="<?= $e($langTo) ?>"
-                title="<?= $e($tr('Язык')) ?>" aria-label="<?= $e($tr('Язык')) ?>">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>
-          <span><?= $e(strtoupper($langTo)) ?></span>
         </button>
       </div>
       <div class="side__bottom">

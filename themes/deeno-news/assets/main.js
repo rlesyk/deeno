@@ -93,16 +93,6 @@
     });
   }
 
-  // Переключение языка интерфейса: ставим куку и перезагружаем страницу
-  var langBtn = document.getElementById('lang-toggle');
-  if (langBtn) {
-    langBtn.addEventListener('click', function () {
-      var to = langBtn.getAttribute('data-lang');
-      document.cookie = 'deeno_lang=' + to + '; path=/; max-age=31536000; samesite=lax';
-      location.reload();
-    });
-  }
-
   var overlay = document.getElementById('search-overlay');
   var openBtn = document.getElementById('search-open');
   var closeBtn = document.getElementById('search-close');

@@ -122,15 +122,14 @@ body.is-locked { position: fixed; left: 0; right: 0; width: 100%; overflow: hidd
 .side__footer { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 8px 14px 14px; }
 /* Переключатели темы и языка (как .sidebar__tools дашборда): тема слева, язык справа */
 .side__tools { display: flex; align-items: center; }
-.side__theme, .side__lang {
+.side__theme {
   display: inline-flex; align-items: center; gap: 5px;
   background: none; border: none; border-radius: var(--radius);
   padding: 6px; font: inherit; font-size: 12px; font-weight: 500; color: var(--fog);
   cursor: pointer; transition: background .15s, color .15s;
 }
-.side__theme:hover, .side__lang:hover { background: var(--frost); color: var(--steel); }
-.side__theme svg, .side__lang svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.side__lang { margin-left: auto; }   /* язык — к правому краю */
+.side__theme:hover { background: var(--frost); color: var(--steel); }
+.side__theme svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 /* moon в светлой теме, sun — в тёмной */
 .side__theme .theme-sun { display: none; }
 :root[data-theme="dark"] .side__theme .theme-moon { display: none; }

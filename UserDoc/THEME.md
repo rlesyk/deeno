@@ -221,8 +221,9 @@ it yourself — `$post->category` isn't suitable for that:
 `get($slug)` always returns `['title', 'description', 'icon', 'position', 'created',
 'modified']` (icon — an image path or emoji for navigation) — if a category has no
 metadata (no one edited it in the admin), `title` equals the `$slug` itself, so calling
-`get()` is safe for any category without extra checks. That's how it's done in all
-three stock themes (`default`, `journal`, `deeno-news`) — each template file
+`get()` is safe for any category without extra checks. That's how it's done in the stock
+themes (`default`, `journal`, `deeno-news`, `deeno-docs`, `deeno-mag`, `deeno-author`) —
+each template file
 (`index.php`, `post.php`) creates its own `new CategoryManager()` instance, like the
 `$e` escaping helper: PHP variables from `layout.php` don't "leak" into the included
 files by design, each template is self-contained.

@@ -153,7 +153,7 @@ if ($curCategory !== '' && !isset($categoryOptions[$curCategory])) {
         <?php endif; ?>
         <label class="field">
           <span class="field__label"><?= e(t('Ссылка')) ?></span>
-          <input type="text" name="slug" id="post-slug" value="<?= $m('slug') ?>" placeholder="avtomaticheski-iz-zagolovka">
+          <input type="text" name="slug" id="post-slug" value="<?= $m('slug') ?>" placeholder="auto-from-title">
         </label>
         <?php if ($isPage): ?>
         <label class="field field--check">
