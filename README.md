@@ -41,6 +41,12 @@ That's it. The wizard checks everything for you and cleans up after itself.
 <p align="center">
   <img src="docs/screenshot1.png" alt="deeno admin dashboard" width="860">
 </p>
+<p align="center">
+  <img src="docs/screenshot2.png" alt="deeno post editor" width="860">
+</p>
+<p align="center">
+  <img src="docs/screenshot3.png" alt="deeno command palette (Cmd+K)" width="860">
+</p>
 
 ## Documentation
 
