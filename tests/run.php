@@ -305,6 +305,36 @@ eq('Неизвестная строка', Lang::t('Неизвестная стр
 unset($GLOBALS['ffcLang']);
 
 // ────────────────────────────────────────────────────────────
+section('Hooks — приоритеты слушателей (плагины v2)');
+
+// Порядок исполнения не должен зависеть от порядка регистрации: плагины
+// грузятся по алфавиту каталогов, и без приоритета «последнее слово» доставалось
+// бы случайному плагину. Меньший приоритет — раньше.
+Hooks::add('t.filter', fn(string $v): string => $v . 'B', 20);
+Hooks::add('t.filter', fn(string $v): string => $v . 'A', 5);
+Hooks::add('t.filter', fn(string $v): string => $v . 'C');   // по умолчанию 10
+eq('_ACB', Hooks::filter('t.filter', '_'), 'фильтры идут по приоритету (5 → 10 → 20)');
+
+// При равном приоритете — порядок регистрации (usort сам по себе нестабилен)
+Hooks::add('t.same', fn(string $v): string => $v . '1', 10);
+Hooks::add('t.same', fn(string $v): string => $v . '2', 10);
+Hooks::add('t.same', fn(string $v): string => $v . '3', 10);
+eq('_123', Hooks::filter('t.same', '_'), 'равный приоритет → порядок регистрации');
+
+$order = [];
+Hooks::add('t.event', function () use (&$order) { $order[] = 'late'; }, 50);
+Hooks::add('t.event', function () use (&$order) { $order[] = 'early'; }, 1);
+Hooks::run('t.event');
+eq('early,late', implode(',', $order), 'события тоже уважают приоритет');
+
+// Старая сигнатура без приоритета обязана работать: плагины 1.0 не переписывают
+Hooks::add('t.legacy', fn(string $v): string => $v . '!');
+eq('x!', Hooks::filter('t.legacy', 'x'), 'add() без приоритета совместим с плагинами 1.0');
+
+// Схема настроек и хранилище значений проверяются в managers.php — там есть
+// песочница с реальными файлами (plugin.json на диске, guard-файл значений).
+
+// ────────────────────────────────────────────────────────────
 echo "\n";
 $t = $GLOBALS['__tests']; $f = $GLOBALS['__fails'];
 if ($f === 0) {

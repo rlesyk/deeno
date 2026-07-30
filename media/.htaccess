@@ -1,0 +1,20 @@
+# Медиатека — только статика. Даже если исполняемый файл каким-то образом
+# окажется здесь, работать он не будет (глубокая защита: загрузчик и так
+# не пропускает ничего, кроме картинок и PDF).
+
+# Отключить обработчик PHP там, где он подключён как модуль
+<IfModule mod_php.c>
+  php_flag engine off
+</IfModule>
+
+# И запретить отдачу исполняемых файлов целиком (CGI/FPM-хостинги,
+# двойные расширения вида shell.php.jpg не страшны — matched по хвосту)
+<FilesMatch "\.(php|phtml|php[0-9]|phar|cgi|pl|py)(\.|$)">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order Allow,Deny
+    Deny from all
+  </IfModule>
+</FilesMatch>

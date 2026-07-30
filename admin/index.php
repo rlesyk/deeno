@@ -257,21 +257,6 @@ function materialLink(Post $p, string $kind, string $adminBase, string $publicUr
     ];
 }
 
-/** Поддерживаемые соцсети: ключ => подпись. Используется в настройках и темами. */
-function socialNetworks(): array
-{
-    return [
-        'telegram'  => 'Telegram',
-        'vk'        => 'VK',
-        'x'         => 'X (Twitter)',
-        'youtube'   => 'YouTube',
-        'instagram' => 'Instagram',
-        'facebook'  => 'Facebook',
-        'github'    => 'GitHub',
-        'linkedin'  => 'LinkedIn',
-    ];
-}
-
 /** Эффективный лимит загрузки в байтах: минимум из upload_max_filesize, post_max_size и 10 МБ. */
 function uploadLimitBytes(): int
 {
@@ -553,7 +538,7 @@ if (isDemoMode() && $isPost) {
         'users'      => ['save', 'delete'],
         'profile'    => [''],   // POST на /profile/ без sub — смена пароля/email
         'themes'     => ['activate', 'install', 'delete'],
-        'plugins'    => ['toggle', 'install', 'delete'],
+        'plugins'    => ['toggle', 'install', 'delete', 'settings'],
         'backups'    => ['create', 'delete'],
         'media'      => ['upload', 'delete'],
     ];
@@ -1157,6 +1142,22 @@ if ($action === 'plugins') {
             : 'installed=1'));
     }
 
+    // Настройки плагина (POST + CSRF). Схема — в plugin.json, значения
+    // хранятся отдельно от кода плагина (system/plugin-data.php).
+    if ($sub === 'settings' && $isPost) {
+        if (!$security->verifyCsrf($_POST['csrf'] ?? null)) {
+            csrfFail();
+        }
+        $name = (string)($_POST['name'] ?? '');
+        $err  = '';
+        if (!PluginManager::hasSettings($name)) {
+            $err = t('У этого плагина нет настроек.');
+        } elseif (!PluginManager::saveSettings($name, $_POST)) {
+            $err = t('Не удалось сохранить настройки плагина (права на /system/?).');
+        }
+        adminRedirect($adminBase . 'plugins/?' . ($err !== '' ? 'error=' . urlencode($err) : 'saved=1'));
+    }
+
     // Удаление (POST + CSRF)
     if ($sub === 'delete' && $isPost) {
         if (!$security->verifyCsrf($_POST['csrf'] ?? null)) {
@@ -1169,17 +1170,29 @@ if ($action === 'plugins') {
             $config['plugins'] = array_values(array_diff(PluginManager::enabled($config), [$name]));
             DataFile::writeMigrating(ROOT_DIR . '/config', $config);
         }
+        // Сохранённые настройки удалённого плагина больше не нужны
+        PluginManager::forget($name);
         adminRedirect($adminBase . 'plugins/?deleted=1');
     }
 
+    // Значения настроек для форм в модалках
+    $allPlugins     = PluginManager::all();
+    $pluginSettings = [];
+    foreach ($allPlugins as $dir => $meta) {
+        if (!empty($meta['settings'])) {
+            $pluginSettings[$dir] = PluginManager::settings($dir);
+        }
+    }
+
     adminRender('plugins', $common + [
-        'title'      => t('Плагины'),
-        'plugins'    => PluginManager::all(),
-        'enabled'    => PluginManager::enabled($config),
-        'saved'      => isset($_GET['saved']),
-        'installed'  => isset($_GET['installed']),
-        'deleted'    => isset($_GET['deleted']),
-        'pluginsErr' => (string)($_GET['error'] ?? ''),
+        'title'          => t('Плагины'),
+        'plugins'        => $allPlugins,
+        'enabled'        => PluginManager::enabled($config),
+        'pluginSettings' => $pluginSettings,
+        'saved'          => isset($_GET['saved']),
+        'installed'      => isset($_GET['installed']),
+        'deleted'        => isset($_GET['deleted']),
+        'pluginsErr'     => (string)($_GET['error'] ?? ''),
     ]);
     exit;
 }
@@ -1420,16 +1433,6 @@ if ($action === 'settings') {
         // Главная: '' — лента постов; иначе slug существующей страницы
         $pageSlugs = array_map(fn($p) => $p->slug, $cms->pages());
 
-        // Соцсети: только известные ключи с http(s)-ссылкой
-        $social    = [];
-        $postedSoc = is_array($_POST['social'] ?? null) ? $_POST['social'] : [];
-        foreach (array_keys(socialNetworks()) as $sk) {
-            $sv = trim((string)($postedSoc[$sk] ?? ''));
-            if ($sv !== '' && preg_match('~^https?://~i', $sv)) {
-                $social[$sk] = $sv;
-            }
-        }
-
         $new    = [
             'site_title'          => trim((string)($_POST['site_title'] ?? '')),
             'site_tagline'        => trim((string)($_POST['site_tagline'] ?? '')),
@@ -1440,7 +1443,6 @@ if ($action === 'settings') {
             'timezone'            => trim((string)($_POST['timezone'] ?? 'Europe/Moscow')),
             'date_format'         => in_array($_POST['date_format'] ?? '', $dateFormats, true) ? (string)$_POST['date_format'] : 'd.m.Y',
             'homepage'            => in_array($_POST['homepage'] ?? '', $pageSlugs, true) ? (string)$_POST['homepage'] : '',
-            'social'              => $social,
             'theme'               => in_array($_POST['theme'] ?? '', $themes, true) ? (string)$_POST['theme'] : 'default',
             'posts_per_page'      => max(1, min(100, (int)($_POST['posts_per_page'] ?? 10))),
             'order_by'            => ($_POST['order_by'] ?? '') === 'position' ? 'position' : 'date',
@@ -1450,8 +1452,6 @@ if ($action === 'settings') {
             'maintenance_message' => trim((string)($_POST['maintenance_message'] ?? '')),
             'cache_enabled'       => !empty($_POST['cache_enabled']),
             'debug'               => !empty($_POST['debug']),
-            'rss_enabled'         => !empty($_POST['rss_enabled']),
-            'rss_items'           => max(1, min(100, (int)($_POST['rss_items'] ?? 20))),
             'sitemap_enabled'     => !empty($_POST['sitemap_enabled']),
             'logo'                => trim((string)($_POST['logo'] ?? '')),
             'favicon'             => trim((string)($_POST['favicon'] ?? '')),

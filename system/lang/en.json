@@ -18,7 +18,6 @@
   "Служебная категория для постов без рубрики — удалить нельзя.": "Service category for posts without a section — cannot be deleted.",
   "Формат даты": "Date format",
   "Главная страница": "Home page",
-  "Соцсети": "Social networks",
   "Черновики и отложенные публикации": "Drafts and scheduled posts",
   "Просмотры · 7 дней": "Views · 7 days",
   "дн. назад": "days ago",
@@ -140,9 +139,6 @@
   "Режим обслуживания": "Maintenance mode",
   "Включить (гости увидят 503)": "Enable (guests will see 503)",
   "Сообщение": "Message",
-  "RSS и Sitemap": "RSS & Sitemap",
-  "RSS-лента (/rss.xml)": "RSS feed (/rss.xml)",
-  "Постов в RSS": "Posts in RSS",
   "Sitemap (/sitemap.xml)": "Sitemap (/sitemap.xml)",
   "Система": "System",
   "Кэш (индекс + страницы)": "Cache (index + pages)",
@@ -385,8 +381,10 @@
   "Счётчики и виджеты: по одному домену в строке. Остальные браузер заблокирует.": "Analytics and widgets: one domain per line. Anything else is blocked by the browser.",
   "В демо-режиме это действие отключено.": "This action is disabled in demo mode.",
   "В демо-режиме загрузка отключена.": "Uploads are disabled in demo mode.",
+  "У этого плагина нет настроек.": "This plugin has no settings.",
+  "Не удалось сохранить настройки плагина (права на /system/?).": "Could not save the plugin settings (is /system/ writable?).",
   "Демо-режим — это песочница, данные сбрасываются ежедневно. Изменяющие действия отключены.": "Demo mode — this is a sandbox, data is reset daily. Modifying actions are disabled.",
   "Демо-доступ": "Demo access",
-  "Логин": "Login",
-  "Песочница сбрасывается ежедневно, часть действий отключена.": "The sandbox is reset daily; some actions are disabled."
+  "Песочница сбрасывается ежедневно, часть действий отключена.": "The sandbox is reset daily; some actions are disabled.",
+  "Sitemap": "Sitemap"
 }

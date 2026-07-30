@@ -56,7 +56,7 @@ GUARD="<?php http_response_code(403); exit('UL CMS'); ?>"
 # ── 2. Конфиг ──
 cat > "$TMP/config.php" <<EOF
 $GUARD
-{"site_title":"Smoke","site_url":"$BASE","theme":"default","language":"ru","timezone":"UTC","posts_per_page":10,"cache_enabled":false,"maintenance_mode":false,"rss_enabled":true,"sitemap_enabled":true,"plugins":[]}
+{"site_title":"Smoke","site_url":"$BASE","theme":"default","language":"ru","timezone":"UTC","posts_per_page":10,"cache_enabled":false,"maintenance_mode":false,"sitemap_enabled":true,"plugins":["rss","social-links"]}
 EOF
 
 # ── 3. Админ (пароль smoke12345) ──
@@ -319,7 +319,7 @@ else
     FAIL=$((FAIL + 1)); printf '  \033[31m✗ frame-src не пропускает видео — ролики сломаются\033[0m\n'
 fi
 # Домены из настройки должны попадать в политику, иначе счётчик молча не работает
-sed -i.bak 's/"plugins":\[\]/"plugins":[],"external_scripts":"mc.yandex.ru"/' "$TMP/config.php"
+sed -i.bak 's/"cache_enabled":false/"cache_enabled":false,"external_scripts":"mc.yandex.ru"/' "$TMP/config.php"
 if curl -s -D- -o /dev/null "$BASE/" | grep -i '^content-security-policy:' | grep -q "https://mc.yandex.ru"; then
     PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m домен счётчика из настроек попадает в политику\n'
 else
@@ -384,10 +384,138 @@ check "author: расстановка закрыта → 403"    403 -b "$JAR2" 
 # Личные настройки панели открыты всем ролям — это не дыра, а осознанное решение
 check "author: настройки панели доступны → 200"  200 -b "$JAR2" "$BASE/admin/settings/"
 
+echo "Плагины v2 (настройки и маршруты):"
+# Тестовый плагин: объявляет настройки в plugin.json и свой маршрут в plugin.php.
+mkdir -p "$TMP/plugins/smoke-demo"
+cat > "$TMP/plugins/smoke-demo/plugin.json" <<'EOF'
+{
+  "name": "Smoke demo",
+  "version": "1.0",
+  "settings": [
+    { "key": "greeting", "label": "Приветствие", "type": "text", "default": "hi" },
+    { "key": "loud", "label": "Громко", "type": "checkbox", "default": false }
+  ]
+}
+EOF
+cat > "$TMP/plugins/smoke-demo/plugin.php" <<'EOF'
+<?php
+declare(strict_types=1);
+PluginManager::route('smoke-hello', function (): void {
+    $g = (string)PluginManager::setting('smoke-demo', 'greeting');
+    if (PluginManager::setting('smoke-demo', 'loud')) $g = strtoupper($g);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo 'PLUGIN-ROUTE:' . $g;
+});
+EOF
+# Включаем плагин в конфиге
+sed -i.bak 's/"social-links"\]/"social-links","smoke-demo"]/' "$TMP/config.php"
+
+# Кнопка настроек и модалка появляются только у плагина со схемой
+PL_HTML="$(curl -s -b "$JAR" "$BASE/admin/plugins/")"
+if printf '%s' "$PL_HTML" | grep -q 'js-plugin-settings' && printf '%s' "$PL_HTML" | grep -q 'id="plugin-settings-smoke-demo"'; then
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m плагины: шестерёнка и модалка настроек отрисованы\n'
+else
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ плагины: нет кнопки настроек или модалки\033[0m\n'
+fi
+
+# Маршрут плагина работает и отдаёт значение по умолчанию
+if curl -s "$BASE/smoke-hello/" | grep -q 'PLUGIN-ROUTE:hi'; then
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m маршрут плагина отвечает (значение по умолчанию)\n'
+else
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ маршрут плагина не отвечает\033[0m\n'
+fi
+
+# Сохранение настроек через форму админки
+curl -s -o /dev/null -b "$JAR" -X POST "$BASE/admin/plugins/settings/" \
+    --data-urlencode "csrf=$CSRF" --data-urlencode "name=smoke-demo" \
+    --data-urlencode "greeting=privet" --data-urlencode "loud=1"
+if grep -q '"greeting": *"privet"' "$TMP/system/plugin-data.php" 2>/dev/null; then
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m настройки плагина сохранены в system/plugin-data.php\n'
+else
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ настройки плагина не сохранились\033[0m\n'
+fi
+# Сохранённое значение реально применяется на маршруте (loud=1 → верхний регистр)
+if curl -s "$BASE/smoke-hello/" | grep -q 'PLUGIN-ROUTE:PRIVET'; then
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m плагин читает сохранённые настройки (checkbox применён)\n'
+else
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ плагин не видит сохранённые настройки\033[0m\n'
+fi
+# Плагин не может перебить существующий адрес сайта: маршрут ядра сильнее.
+# (Маршруты плагинов спрашиваются внутри handle404 — то есть только когда ядро
+# ничего не нашло; /about/ — реальная страница из фикстур.)
+if curl -s "$BASE/about/" | grep -q 'PLUGIN-ROUTE'; then
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ плагин перебил существующую страницу\033[0m\n'
+else
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m маршруты плагина не перебивают адреса ядра\n'
+fi
+sed -i.bak 's/,"smoke-demo"\]/]/' "$TMP/config.php"
+rm -rf "$TMP/plugins/smoke-demo" "$TMP/system/plugin-data.php"
+
+echo "RSS и соцсети как плагины:"
+# Лента и ссылки на соцсети переехали в плагины rss и social-links.
+# Ядро о них не знает: выключили плагин — функции нет вообще.
+if curl -s "$BASE/rss.xml" | grep -q '<rss'; then
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m плагин rss отдаёт валидную ленту\n'
+else
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ плагин rss не отдал ленту\033[0m\n'
+fi
+# Автодискавери-<link> добавляет плагин через site.head
+if curl -s "$BASE/" | grep -q 'application/rss+xml'; then
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m автодискавери RSS в <head> (от плагина)\n'
+else
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ нет автодискавери RSS в <head>\033[0m\n'
+fi
+# Ссылки на соцсети: пока не заданы — тема ничего не рисует
+if curl -s "$BASE/" | grep -q 'aria-label="telegram"'; then
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ соцсети показаны, хотя адрес не задан\033[0m\n'
+else
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m соцсети не показаны, пока адреса не заданы\n'
+fi
+# Задаём адрес через настройки плагина — ссылка появляется в подвале
+curl -s -o /dev/null -b "$JAR" -X POST "$BASE/admin/plugins/settings/" \
+    --data-urlencode "csrf=$CSRF" --data-urlencode "name=social-links" \
+    --data-urlencode "telegram=https://t.me/deeno" --data-urlencode "vk=не-ссылка"
+HOME_HTML="$(curl -s "$BASE/")"
+if printf '%s' "$HOME_HTML" | grep -q 'https://t.me/deeno'; then
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m заданная соцсеть появилась на сайте\n'
+else
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ заданная соцсеть не появилась\033[0m\n'
+fi
+# Мусор вместо URL в подвал не пускаем (в теме — только http(s))
+if printf '%s' "$HOME_HTML" | grep -q 'не-ссылка'; then
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ не-URL просочился в разметку\033[0m\n'
+else
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m значение без http(s) отброшено\n'
+fi
+# Настройки RSS и соцсетей больше не живут в «Настройках сайта»
+SET2="$(curl -s -b "$JAR" "$BASE/admin/settings/")"
+if printf '%s' "$SET2" | grep -qE 'name="rss_enabled"|name="social\['; then
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ в Настройках остались поля RSS/соцсетей\033[0m\n'
+else
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m Настройки сайта очищены от RSS и соцсетей\n'
+fi
+# Выключаем оба плагина — функции пропадают полностью
+sed -i.bak 's/"plugins":\["rss","social-links"\]/"plugins":[]/' "$TMP/config.php"
+rm -rf "$TMP/cache/pages"
+check "без плагина rss.xml → 404"   404 "$BASE/rss.xml"
+OFF_HTML="$(curl -s "$BASE/")"
+if printf '%s' "$OFF_HTML" | grep -q 'application/rss+xml'; then
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ автодискавери остался после выключения плагина\033[0m\n'
+else
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m без плагина автодискавери исчез\n'
+fi
+if printf '%s' "$OFF_HTML" | grep -q 'https://t.me/deeno'; then
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ соцсети остались после выключения плагина\033[0m\n'
+else
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m без плагина соцсети исчезли\n'
+fi
+sed -i.bak 's/"plugins":\[\]/"plugins":["rss","social-links"]/' "$TMP/config.php"
+rm -rf "$TMP/cache/pages"
+
 echo "Демо-режим:"
 # Публичная песочница: изменяющие действия запрещены на СЕРВЕРЕ (не только в UI),
 # создание/правка контента и личные настройки панели — разрешены.
-sed -i.bak 's/"plugins":\[\]/"plugins":[],"demo_mode":true/' "$TMP/config.php"
+sed -i.bak 's/"cache_enabled":false/"cache_enabled":false,"demo_mode":true/' "$TMP/config.php"
 
 # Запрещённое: создание пользователя. Проверяем и редирект на ?demo=1, и что
 # файл пользователя НЕ появился (доказывает серверный отказ, а не только UI).

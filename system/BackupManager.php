@@ -12,6 +12,7 @@ class BackupManager
         'config.php', 'config.json',
         'system/categories.php',  // метаданные категорий (Название/Описание)
         'system/redirects.json',  // 301-редиректы при смене slug/категории
+        'system/plugin-data.php', // сохранённые настройки плагинов
     ];
 
     private string $root;
@@ -35,7 +36,12 @@ class BackupManager
             return ['error' => 'Нет прав на запись в /backups/.'];
         }
 
-        $name = 'backup-' . date('Y-m-d-His') . '.zip';
+        // Имя содержит случайный суффикс: на хостингах, где статику отдаёт nginx
+        // мимо Apache, .htaccess в /backups/ не применяется, и архив с
+        // предсказуемым именем (backup-ДАТА-ВРЕМЯ.zip) скачивается перебором.
+        // 12 hex-символов делают адрес неугадываемым; deny-правила остаются
+        // первой линией защиты, это — вторая.
+        $name = 'backup-' . date('Y-m-d-His') . '-' . bin2hex(random_bytes(6)) . '.zip';
         $path = $this->backupsDir . $name;
 
         $zip = new ZipArchive();
@@ -75,7 +81,8 @@ class BackupManager
     /** Абсолютный путь для скачивания (с валидацией имени) */
     public function path(string $name): ?string
     {
-        if (!preg_match('/^backup-[\d-]+\.zip$/', $name)) return null;
+        // Старые архивы (без случайного суффикса) тоже должны скачиваться
+        if (!preg_match('/^backup-[\d-]+(?:-[0-9a-f]{12})?\.zip$/', $name)) return null;
         $path = $this->backupsDir . $name;
         return is_file($path) ? $path : null;
     }

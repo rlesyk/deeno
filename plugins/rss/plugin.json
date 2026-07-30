@@ -1,0 +1,15 @@
+{
+    "name": "RSS feed",
+    "description": "Publishes an RSS 2.0 feed at /rss.xml and adds the autodiscovery link to every page, so readers and aggregators find it. Turn the plugin off and the feed is gone.",
+    "version": "1.0",
+    "author": "deeno",
+    "settings": [
+        {
+            "key": "items",
+            "label": "Items in the feed",
+            "type": "number",
+            "default": 20,
+            "hint": "How many latest posts the feed contains."
+        }
+    ]
+}

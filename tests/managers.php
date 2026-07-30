@@ -551,9 +551,45 @@ if (class_exists('ZipArchive')) {
     $res = $bk->create();
     ok(!isset($res['error']), 'create() без ошибки');
     ok(count($bk->all()) >= 1, 'all(): созданный бэкап в списке');
+
+    // Регресс (2026-07-30): имя бэкапа было предсказуемым — backup-ДАТА-ВРЕМЯ.zip.
+    // На хостингах, где статику отдаёт nginx мимо Apache, .htaccess в /backups/
+    // не применяется, и архив с bcrypt-хешами скачивался перебором имени.
+    // Случайный суффикс делает адрес неугадываемым.
+    $name = (string)($res['file'] ?? '');
+    ok((bool)preg_match('/^backup-\d{4}-\d{2}-\d{2}-\d{6}-[0-9a-f]{12}\.zip$/', $name),
+        "имя бэкапа содержит случайный суффикс ($name)");
+
+    $second = $bk->create();
+    ok(($second['file'] ?? '') !== $name, 'два бэкапа подряд — разные имена');
+
+    // Скачивание своих файлов не сломалось, чужое по-прежнему отвергается
+    ok($bk->path($name) !== null, 'path(): новый файл со суффиксом скачивается');
+    ok($bk->path('backup-2026-01-01-000000.zip') === null, 'path(): несуществующий файл → null');
+    ok($bk->path('../config.php') === null, 'path(): выход за каталог отвергнут');
 } else {
     echo "  (расширение zip не установлено — BackupManager пропущен)\n";
 }
+
+// ────────────────────────────────────────────────────────────
+section('Защита папок с данными (.htaccess в дистрибутиве)');
+
+// Регресс (2026-07-30): .htaccess этих папок не попадали в git из-за правил
+// вида «/backups/*», и у всех, кто скачал deeno с GitHub, каталоги были
+// открыты. Проверяем НЕ песочницу, а реальный репозиторий.
+$repo = dirname(__DIR__);
+foreach (['backups', 'users', 'cache', 'content', 'system/logs'] as $dir) {
+    $file = $repo . '/' . $dir . '/.htaccess';
+    $body = is_file($file) ? (string)file_get_contents($file) : '';
+    ok($body !== '' && str_contains($body, 'Require all denied'),
+        "$dir/.htaccess есть в дистрибутиве и запрещает доступ");
+}
+// Медиатеке доступ нужен (картинки), но исполнение PHP — нет
+$mediaHt = (string)@file_get_contents($repo . '/media/.htaccess');
+ok(str_contains($mediaHt, 'engine off') && str_contains($mediaHt, 'php'),
+    'media/.htaccess запрещает исполнение PHP, но не отдачу файлов');
+ok(!preg_match('/^\s*Require all denied/m', str_replace('FilesMatch', '', $mediaHt)) || str_contains($mediaHt, 'FilesMatch'),
+    'media/.htaccess не блокирует картинки целиком');
 
 // ────────────────────────────────────────────────────────────
 section('ThemeManager — наследование шаблонов');
@@ -633,6 +669,91 @@ file_put_contents(ROOT_DIR . '/plugins/pb/plugin.php', "<?php\n");
 $all = PluginManager::all();
 ok(isset($all['pa']) && isset($all['pb']), 'all(): оба плагина в списке');
 eq(['pa'], array_values(PluginManager::enabled(['plugins' => ['pa']])), 'enabled(): фильтр по config');
+
+// ────────────────────────────────────────────────────────────
+section('PluginManager — настройки плагина (плагины v2)');
+
+// Плагин со схемой настроек. Манифест приходит из ZIP, поэтому среди годных
+// полей намеренно лежит мусор: он должен молча отбрасываться, а не ломать
+// страницу «Плагины».
+@mkdir(ROOT_DIR . '/plugins/pc', 0755, true);
+file_put_contents(ROOT_DIR . '/plugins/pc/plugin.php', "<?php\n");
+file_put_contents(ROOT_DIR . '/plugins/pc/plugin.json', json_encode([
+    'name'     => 'Плагин C',
+    'settings' => [
+        ['key' => 'title',  'label' => 'Заголовок', 'type' => 'text',     'default' => 'привет', 'hint' => 'подсказка'],
+        ['key' => 'count',  'label' => 'Сколько',   'type' => 'number',   'default' => 3],
+        ['key' => 'shown',  'label' => 'Показать',  'type' => 'checkbox', 'default' => true],
+        ['key' => 'mode',   'label' => 'Режим',     'type' => 'select',   'default' => 'a', 'options' => ['a' => 'A', 'b' => 'B']],
+        ['key' => 'bad',    'label' => 'Пароль',    'type' => 'password'],                 // неизвестный тип
+        ['key' => '',       'label' => 'Без ключа', 'type' => 'text'],                     // пустой ключ
+        ['key' => 'bad key', 'label' => 'Пробел',   'type' => 'text'],                     // недопустимый ключ
+        ['key' => 'nosel',  'label' => 'Селект',    'type' => 'select'],                   // select без options
+        'мусор',                                                                            // вообще не поле
+    ],
+], JSON_UNESCAPED_UNICODE));
+
+$schema = PluginManager::schema('pc');
+eq(4, count($schema), 'схема: негодные поля отброшены, годные остались');
+eq('title,count,shown,mode', implode(',', array_column($schema, 'key')), 'схема: порядок полей сохранён');
+eq('подсказка', $schema[0]['hint'], 'схема: hint читается из манифеста');
+ok(PluginManager::hasSettings('pc'), 'hasSettings(): у pc настройки есть');
+ok(!PluginManager::hasSettings('pa'), 'hasSettings(): у pa настроек нет');
+eq([], PluginManager::schema('pa'), 'schema(): без настроек — пустой массив');
+
+// Пока ничего не сохраняли — значения равны default из манифеста
+eq('привет', PluginManager::setting('pc', 'title'), 'setting(): значение по умолчанию');
+eq(3, PluginManager::setting('pc', 'count'), 'setting(): число по умолчанию');
+ok(PluginManager::setting('pc', 'shown') === true, 'setting(): checkbox по умолчанию true');
+eq(null, PluginManager::setting('pc', 'нет-такого'), 'setting(): неизвестный ключ → null');
+eq('запас', PluginManager::setting('pc', 'нет-такого', 'запас'), 'setting(): fallback для неизвестного ключа');
+
+// Сохранение: типы приводятся по схеме, чужие ключи в файл не попадают
+ok(PluginManager::saveSettings('pc', [
+    'title'   => '  Новый  ',      // строки тримятся
+    'count'   => '42',             // number → int
+    'shown'   => '',               // пусто → false
+    'mode'    => 'b',
+    'чужое'   => 'не должно попасть',
+]), 'saveSettings(): сохранение прошло');
+eq('Новый', PluginManager::setting('pc', 'title'), 'saveSettings(): строка обрезана по краям');
+ok(PluginManager::setting('pc', 'count') === 42, 'saveSettings(): number приведён к int');
+ok(PluginManager::setting('pc', 'shown') === false, 'saveSettings(): checkbox без значения → false');
+eq('b', PluginManager::setting('pc', 'mode'), 'saveSettings(): select сохранён');
+
+$stored = (array)(DataFile::readWithLegacy(ROOT_DIR . '/system/plugin-data')[0]['pc'] ?? []);
+ok(!array_key_exists('чужое', $stored), 'saveSettings(): ключ вне схемы в файл не записан');
+ok(is_file(ROOT_DIR . '/system/plugin-data.php'), 'значения лежат в guard-файле system/plugin-data.php');
+
+// select со значением вне списка вариантов откатывается к default
+PluginManager::saveSettings('pc', ['mode' => 'подделка', 'title' => 'x', 'count' => 1]);
+eq('a', PluginManager::setting('pc', 'mode'), 'saveSettings(): чужой вариант select → default');
+
+ok(!PluginManager::saveSettings('pa', ['x' => 1]), 'saveSettings(): у плагина без схемы сохранять нечего');
+
+// Удаление плагина забывает его настройки, чужие не трогает
+PluginManager::saveSettings('pc', ['title' => 'останется', 'count' => 7, 'mode' => 'a']);
+PluginManager::forget('pc');
+eq('привет', PluginManager::setting('pc', 'title'), 'forget(): значения стёрты, вернулся default');
+
+// ────────────────────────────────────────────────────────────
+section('PluginManager — маршруты плагинов');
+
+PluginManager::route('hello', function (array $segments) { echo 'HELLO:' . implode('/', $segments); });
+PluginManager::route('deep/path/', function () { echo 'DEEP'; });   // лишние слэши срезаются
+ok(in_array('hello', PluginManager::routes(), true), 'route(): маршрут зарегистрирован');
+ok(in_array('deep/path', PluginManager::routes(), true), 'route(): путь нормализован без слэшей');
+
+ob_start();
+$hit = PluginManager::dispatch(['hello']);
+$out = (string)ob_get_clean();
+ok($hit, 'dispatch(): свой маршрут перехвачен');
+eq('HELLO:hello', $out, 'dispatch(): обработчик получил сегменты и напечатал ответ');
+
+ob_start();
+$miss = PluginManager::dispatch(['ничего', 'такого']);
+ob_end_clean();
+ok(!$miss, 'dispatch(): чужой путь не перехватывается (уйдёт в 404)');
 
 // ────────────────────────────────────────────────────────────
 section('CategoryManager — порядок, даты, сортировка');

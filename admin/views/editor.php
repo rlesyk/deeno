@@ -88,6 +88,9 @@ if ($curCategory !== '' && !isset($categoryOptions[$curCategory])) {
       <button type="button" data-md="quote" title="<?= e(t('Цитата')) ?>"><?= icon('quote') ?></button>
       <button type="button" data-md="table" title="<?= e(t('Таблица')) ?>"><?= icon('table') ?></button>
       <button type="button" data-md="hr" title="<?= e(t('Линия-разделитель')) ?>"><?= icon('minus') ?></button>
+      <?php /* Точка расширения для плагинов: свои кнопки в конце панели.
+               Разметка — как у соседей: <button type="button" data-md="…">. */ ?>
+      <?= Hooks::filter('editor.toolbar', '') ?>
     </div>
 
     <div class="editor__content-wrap" id="dropzone">

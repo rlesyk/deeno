@@ -1011,6 +1011,19 @@ function dnTf(s, v) { return dnT(s).replace('%s', String(v)); }
     pModal.addEventListener('click', function (e) { if (e.target === pModal) pModal.hidden = true; });
   }
 
+  // ---------- Модалки настроек плагинов ----------
+  // Форма каждого плагина отрисована на сервере в своей модалке
+  // (#plugin-settings-<каталог>) — кнопка просто показывает нужную.
+  document.querySelectorAll('.js-plugin-settings').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var modal = document.getElementById('plugin-settings-' + (btn.dataset.name || ''));
+      if (modal) modal.hidden = false;
+    });
+  });
+  document.querySelectorAll('[id^="plugin-settings-"]').forEach(function (modal) {
+    modal.addEventListener('click', function (e) { if (e.target === modal) modal.hidden = true; });
+  });
+
   // ---------- Модалка удаления бэкапа ----------
   var bModal = document.getElementById('backup-delete-modal');
   if (bModal) {

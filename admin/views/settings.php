@@ -175,15 +175,9 @@ $canEditSite = !empty($isSiteAdmin);
       </div>
 
       <div class="card">
-        <h2 class="card__title"><?= e(t('RSS и Sitemap')) ?></h2>
-        <label class="field field--check">
-          <input type="checkbox" name="rss_enabled" value="1" <?= !empty($config['rss_enabled']) ? 'checked' : '' ?>>
-          <span><?= e(t('RSS-лента (/rss.xml)')) ?></span>
-        </label>
-        <label class="field">
-          <span class="field__label"><?= e(t('Постов в RSS')) ?></span>
-          <input type="number" name="rss_items" min="1" max="100" value="<?= $c('rss_items', '20') ?>">
-        </label>
+        <h2 class="card__title"><?= e(t('Sitemap')) ?></h2>
+        <?php /* RSS-лента переехала в одноимённый плагин: адрес, автодискавери
+                 и число записей — там же (Плагины → RSS feed → настройки). */ ?>
         <label class="field field--check">
           <input type="checkbox" name="sitemap_enabled" value="1" <?= !empty($config['sitemap_enabled']) ? 'checked' : '' ?>>
           <span><?= e(t('Sitemap (/sitemap.xml)')) ?></span>
@@ -233,15 +227,8 @@ $canEditSite = !empty($isSiteAdmin);
         </label>
       </div>
 
-      <div class="card">
-        <h2 class="card__title"><?= e(t('Соцсети')) ?></h2>
-        <?php foreach (socialNetworks() as $key => $label): ?>
-          <label class="field">
-            <span class="field__label"><?= e($label) ?></span>
-            <input type="url" name="social[<?= e($key) ?>]" value="<?= e((string)($config['social'][$key] ?? '')) ?>" placeholder="https://">
-          </label>
-        <?php endforeach; ?>
-      </div>
+      <?php /* Ссылки на соцсети переехали в плагин «Social links»
+               (Плагины → шестерёнка). */ ?>
     </div>
   </div>
 </form>

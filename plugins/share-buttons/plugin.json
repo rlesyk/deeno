@@ -1,6 +1,22 @@
 {
     "name": "Share buttons",
-    "description": "Adds Telegram, VK and X sharing links at the end of an article. No tracking — plain share URLs, icons come from the system.",
-    "version": "1.0",
-    "author": "deeno"
+    "description": "Adds sharing links at the end of an article. No tracking — plain share URLs, icons come from the system. Networks and the label are configurable.",
+    "version": "2.0",
+    "author": "deeno",
+    "settings": [
+        {
+            "key": "networks",
+            "label": "Networks",
+            "type": "text",
+            "default": "telegram,vk,x",
+            "hint": "Comma-separated. Supported: telegram, vk, x, facebook."
+        },
+        {
+            "key": "label",
+            "label": "Label",
+            "type": "text",
+            "default": "Share:",
+            "hint": "Text before the icons. Leave empty to show icons only."
+        }
+    ]
 }

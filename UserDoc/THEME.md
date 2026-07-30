@@ -106,11 +106,14 @@ $site->url          // URL with no trailing slash
 $site->language     // 'ru' / 'en'
 $site->logo         // Path to the logo image from settings ('' — not set).
                     // If set — show the image next to the title; if '' — title only.
-$site->rss          // bool: the RSS feed is enabled in settings. Hide the RSS link when false.
+$site->rss          // bool: an RSS feed exists (the RSS plugin is on). Hide the RSS link when false.
 $site->categoryOrder // Section ordering mode (for documentation themes):
 $site->articleOrder  // manual | alpha | created | modified. See the helpers below.
 $site->social       // Array of socials: [['name'=>'telegram','url'=>'https://…'], …]
-                    // Only those filled in settings. Take the icon from SocialIcons::svg($name).
+                    // Only the ones filled in. Take the icon from SocialIcons::svg($name).
+                    // Both $site->rss and $site->social are provided by the stock
+                    // plugins (RSS feed / Social links) and are empty when those are
+                    // off — so always keep them behind a check, as shown below.
 ```
 
 **The documentation theme.** The stock `deeno-docs` theme (wiki/docs) builds a "section

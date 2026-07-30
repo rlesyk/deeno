@@ -22,8 +22,6 @@
     "smtp_port": 587,
     "smtp_user": "",
     "smtp_pass": "",
-    "rss_enabled": true,
-    "rss_items": 20,
     "sitemap_enabled": true,
     "logo": "",
     "favicon": "",
@@ -33,5 +31,5 @@
     "demo_mode": false,
     "demo_login": "",
     "demo_pass": "",
-    "plugins": []
+    "plugins": ["rss", "social-links"]
 }

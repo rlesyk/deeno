@@ -60,6 +60,10 @@ defined('FFC_ADMIN') or exit;
                     aria-checked="<?= $on ? 'true' : 'false' ?>"
                     title="<?= e($on ? t('Выключить') : t('Включить')) ?>"><span class="switch__knob"></span></button>
           </form>
+          <?php if (!empty($p['settings'])): ?>
+            <button type="button" class="btn btn--small btn--secondary js-plugin-settings" title="<?= e(t('Настройки')) ?>"
+                    data-name="<?= e($p['dir']) ?>" data-title="<?= e($p['name']) ?>"><?= icon('sliders') ?></button>
+          <?php endif; ?>
           <button type="button" class="btn btn--small btn--danger js-plugin-delete" title="<?= e(t('Удалить')) ?>"
                   data-name="<?= e($p['dir']) ?>" data-title="<?= e($p['name']) ?>"><?= icon('trash') ?></button>
         </div>
@@ -67,6 +71,53 @@ defined('FFC_ADMIN') or exit;
     <?php endforeach; ?>
   </div>
 <?php endif; ?>
+
+<?php /* Настройки плагина — своя модалка на каждый плагин, форма рисуется на
+         сервере по схеме из plugin.json. Схему не передаём в JS: меньше кода
+         и никакого шанса вставить сырые данные в разметку скриптом. */ ?>
+<?php foreach ($plugins as $p): if (empty($p['settings'])) continue; ?>
+  <div class="modal" id="plugin-settings-<?= e($p['dir']) ?>" hidden>
+    <div class="modal__box">
+      <h3 class="modal__title"><?= e($p['name']) ?></h3>
+      <form method="post" action="<?= e($adminBase) ?>plugins/settings/">
+        <?= $security->csrfField() ?>
+        <input type="hidden" name="name" value="<?= e($p['dir']) ?>">
+        <?php $values = $pluginSettings[$p['dir']] ?? []; ?>
+        <?php foreach ($p['settings'] as $f): $val = $values[$f['key']] ?? $f['default']; ?>
+          <?php if ($f['type'] === 'checkbox'): ?>
+            <label class="field field--check">
+              <input type="checkbox" name="<?= e($f['key']) ?>" value="1" <?= !empty($val) ? 'checked' : '' ?>>
+              <span class="switch-check__track"><span class="switch-check__knob"></span></span>
+              <span class="field__label"><?= e($f['label']) ?></span>
+            </label>
+          <?php else: ?>
+            <label class="field">
+              <span class="field__label"><?= e($f['label']) ?></span>
+              <?php if ($f['type'] === 'textarea'): ?>
+                <textarea name="<?= e($f['key']) ?>" rows="4"><?= e((string)$val) ?></textarea>
+              <?php elseif ($f['type'] === 'select'): ?>
+                <select name="<?= e($f['key']) ?>">
+                  <?php foreach ($f['options'] as $ov => $ol): ?>
+                    <option value="<?= e((string)$ov) ?>" <?= (string)$val === (string)$ov ? 'selected' : '' ?>><?= e($ol) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              <?php elseif ($f['type'] === 'number'): ?>
+                <input type="number" name="<?= e($f['key']) ?>" value="<?= e((string)$val) ?>">
+              <?php else: ?>
+                <input type="text" name="<?= e($f['key']) ?>" value="<?= e((string)$val) ?>">
+              <?php endif; ?>
+            </label>
+          <?php endif; ?>
+          <?php if ($f['hint'] !== ''): ?><p class="field__hint"><?= e($f['hint']) ?></p><?php endif; ?>
+        <?php endforeach; ?>
+        <div class="modal__actions">
+          <button type="button" class="btn btn--secondary js-modal-close"><?= e(t('Отмена')) ?></button>
+          <button type="submit" class="btn btn--primary"><?= e(t('Сохранить')) ?></button>
+        </div>
+      </form>
+    </div>
+  </div>
+<?php endforeach; ?>
 
 <!-- Модальное окно подтверждения удаления плагина -->
 <div class="modal" id="plugin-delete-modal" hidden>

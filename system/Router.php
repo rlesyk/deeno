@@ -193,10 +193,8 @@ class Router
         $count = count($segments);
 
         // 1. Служебные файлы
-        if ($uri === '/rss.xml/' || $uri === '/rss.xml') {
-            $this->handleRss();
-            return;
-        }
+        // /rss.xml обслуживает плагин «rss» (маршрут регистрируется им самим),
+        // поэтому здесь остался только sitemap.
         if ($uri === '/sitemap.xml/' || $uri === '/sitemap.xml') {
             $this->handleSitemap();
             return;
@@ -452,6 +450,13 @@ class Router
             return;
         }
 
+        // Маршруты плагинов: сюда запрос доходит, только если ядро ничего не
+        // нашло, — поэтому плагин добавляет свои URL, но перебить существующий
+        // адрес сайта (пост, страницу, категорию) не может.
+        if (PluginManager::dispatch($this->parseSegments($this->getUri()))) {
+            return;
+        }
+
         http_response_code(404);
         $site = $this->siteObject();
         $this->theme->render('404', compact('site')
@@ -575,18 +580,6 @@ class Router
         }
     }
 
-    private function handleRss(): void
-    {
-        if (file_exists(ROOT_DIR . '/system/RssManager.php')) {
-            require_once ROOT_DIR . '/system/RssManager.php';
-            $rss = new RssManager($this->config, $this->cms);
-            $rss->output();
-        } else {
-            http_response_code(404);
-            echo 'RSS not available.';
-        }
-    }
-
     private function handleSitemap(): void
     {
         if (file_exists(ROOT_DIR . '/system/SitemapManager.php')) {
@@ -690,13 +683,19 @@ class Router
                 $this->url         = rtrim((string)($c['site_url'] ?? ''), '/');
                 $this->language    = (string)($c['language'] ?? 'ru');
                 $this->logo        = (string)($c['logo'] ?? '');
-                $this->rss         = !empty($c['rss_enabled']);
                 $this->categoryOrder = (string)($c['category_order'] ?? 'alpha');
                 $this->articleOrder  = (string)($c['article_order'] ?? 'manual');
-                $this->social      = [];
-                foreach ((array)($c['social'] ?? []) as $name => $link) {
-                    if (is_string($link) && $link !== '') {
-                        $this->social[] = ['name' => (string)$name, 'url' => $link];
+
+                // RSS-лента и ссылки на соцсети приходят от плагинов (rss и
+                // social-links). Без них фильтры пусты, и тема просто ничего
+                // не рисует — у всех тем эти блоки под условием.
+                $this->rss    = (bool)Hooks::filter('site.rss', false);
+                $this->social = [];
+                foreach ((array)Hooks::filter('site.social', []) as $item) {
+                    $name = (string)($item['name'] ?? '');
+                    $url  = (string)($item['url'] ?? '');
+                    if ($name !== '' && $url !== '') {
+                        $this->social[] = ['name' => $name, 'url' => $url];
                     }
                 }
             }

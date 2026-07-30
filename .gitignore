@@ -17,13 +17,21 @@
 /system/security.json
 
 # Рантайм-данные конкретной установки (создаются при работе, не при установке):
-# метаданные категорий (guard-файл) и 301-редиректы при смене slug/категории.
+# метаданные категорий (guard-файл), 301-редиректы при смене slug/категории
+# и сохранённые настройки плагинов.
 /system/categories.php
 /system/redirects.json
+/system/plugin-data.php
+/system/plugin-data.lock
+
+# ВАЖНО: защитные .htaccess этих папок ОБЯЗАНЫ попадать в дистрибутив
+# (строки «!…/.htaccess» ниже). Без них на Apache-хостинге открыты /backups/,
+# /users/ и /cache/ — архив с bcrypt-хешами качается по прямой ссылке.
 
 # Логи (создаются в рантайме).
 /system/logs/*
 !/system/logs/.gitkeep
+!/system/logs/.htaccess
 
 # Файлы сессий админки (создаются в рантайме, каталог — самим Security).
 /system/sessions/
@@ -31,18 +39,22 @@
 # Аккаунты пользователей: bcrypt-хеши + email. Создаются установщиком.
 /users/*
 !/users/.gitkeep
+!/users/.htaccess
 
 # Резервные копии сайта.
 /backups/*
 !/backups/.gitkeep
+!/backups/.htaccess
 
 # Загруженные медиафайлы (папка сохраняется, содержимое — нет).
 /media/*
 !/media/.gitkeep
+!/media/.htaccess
 
 # Кэш рендера, индекс постов и статистика просмотров.
 /cache/*
 !/cache/.gitkeep
+!/cache/.htaccess
 
 # Контент сайта: посты и страницы (пользовательские .md).
 # Папки сохраняются пустыми, содержимое — не коммитим.

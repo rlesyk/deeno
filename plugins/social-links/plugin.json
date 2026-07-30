@@ -1,0 +1,16 @@
+{
+    "name": "Social links",
+    "description": "Shows links to your social profiles where the theme has a place for them (usually the footer). Fill in only the networks you use — the rest stay hidden.",
+    "version": "1.0",
+    "author": "deeno",
+    "settings": [
+        { "key": "telegram",  "label": "Telegram",    "type": "text", "default": "", "hint": "Full URL, e.g. https://t.me/yourname" },
+        { "key": "vk",        "label": "VK",          "type": "text", "default": "" },
+        { "key": "x",         "label": "X (Twitter)", "type": "text", "default": "" },
+        { "key": "youtube",   "label": "YouTube",     "type": "text", "default": "" },
+        { "key": "instagram", "label": "Instagram",   "type": "text", "default": "" },
+        { "key": "facebook",  "label": "Facebook",    "type": "text", "default": "" },
+        { "key": "github",    "label": "GitHub",      "type": "text", "default": "" },
+        { "key": "linkedin",  "label": "LinkedIn",    "type": "text", "default": "" }
+    ]
+}

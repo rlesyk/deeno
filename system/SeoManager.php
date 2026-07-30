@@ -14,7 +14,6 @@ class SeoManager
     private string $siteUrl;
     private string $defaultOgImage;
     private string $favicon;
-    private bool   $rssEnabled;
 
     public function __construct(array $config)
     {
@@ -23,7 +22,6 @@ class SeoManager
         $this->siteUrl         = rtrim((string)($config['site_url'] ?? ''), '/');
         $this->defaultOgImage  = (string)($config['og_image'] ?? '');
         $this->favicon         = (string)($config['favicon'] ?? '');
-        $this->rssEnabled      = !empty($config['rss_enabled']);
     }
 
     /**
@@ -78,10 +76,8 @@ class SeoManager
             $lines[] = '<meta name="twitter:image" content="' . $e($ogImage) . '">';
         }
 
-        // RSS
-        if ($this->rssEnabled) {
-            $lines[] = '<link rel="alternate" type="application/rss+xml" title="' . $e($this->siteTitle) . '" href="' . $e($this->siteUrl . '/rss.xml') . '">';
-        }
+        // Автодискавери RSS добавляет плагин «rss» через фильтр site.head —
+        // ядро о ленте больше не знает.
 
         // JSON-LD
         $lines[] = $this->jsonLd($post, $title, $description, $url, $ogImage);

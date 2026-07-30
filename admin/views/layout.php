@@ -25,6 +25,9 @@ $uiTheme = ($adminTheme ?? 'light') === 'dark' ? 'dark' : 'light';
   <?php if (($siteFavicon ?? '') !== ''): ?><link rel="icon" href="<?= e($siteFavicon) ?>"><?php endif; ?>
   <title><?= e($title) ?> / <?= e($siteTitle) ?></title>
   <link rel="stylesheet" href="<?= e($adminBase) ?>assets/admin.css?v=<?= (int)@filemtime(__DIR__ . '/../assets/admin.css') ?>">
+  <?php /* Точка расширения для плагинов: свои стили/мета в <head> админки.
+           Инлайн-скрипты здесь не пройдут — у админки строгий CSP с nonce. */ ?>
+  <?= Hooks::filter('admin.head', '') ?>
 </head>
 <body>
 

@@ -30,6 +30,43 @@ when a plugin is toggled and when its code is edited.
 }
 ```
 
+### Settings (optional)
+
+Declare a `settings` array and deeno renders the form for you: the plugin row on
+the **Plugins** page gets a gear button that opens a modal. Values are stored
+outside your plugin folder (`system/plugin-data.php`), so reinstalling or
+updating the plugin never wipes them.
+
+```json
+{
+  "name": "Share buttons",
+  "version": "2.0",
+  "settings": [
+    { "key": "networks", "label": "Networks", "type": "text",
+      "default": "telegram,vk,x", "hint": "Comma-separated." },
+    { "key": "limit",    "label": "How many", "type": "number",  "default": 5 },
+    { "key": "compact",  "label": "Compact",  "type": "checkbox", "default": false },
+    { "key": "mode",     "label": "Mode",     "type": "select",  "default": "full",
+      "options": { "full": "Full", "short": "Short" } }
+  ]
+}
+```
+
+Field types: `text`, `textarea`, `number`, `checkbox`, `select` (a `select`
+requires `options`). A field without a valid `key`/`type` is ignored, so a
+malformed manifest can never break the Plugins page.
+
+Read the values in `plugin.php`:
+
+```php
+$networks = PluginManager::setting('share-buttons', 'networks');   // one value
+$all      = PluginManager::settings('share-buttons');              // all of them
+```
+
+The first argument is your plugin's **folder name**. Values come back typed
+(`checkbox` → bool, `number` → int); if nothing is saved yet, you get the
+`default` from the manifest.
+
 ## plugin.php
 
 The file is simply executed on CMS startup (both on the site and in the admin
@@ -57,6 +94,13 @@ The listener receives a value and a context and returns a new value
 | `post.content` | article HTML | `['post' => Post]` | When a theme renders a post/page |
 | `site.head` | HTML string | — | The theme inserts it into `<head>` |
 | `site.footer` | HTML string | — | The theme inserts it before `</body>` |
+| `admin.head` | HTML string | — | Inserted into `<head>` of the admin panel |
+| `editor.toolbar` | HTML string | — | Extra buttons at the end of the editor toolbar |
+
+`admin.head` and `editor.toolbar` run in the admin panel, which sends a strict
+CSP with a nonce — inline `<script>` will be blocked, link an external file
+instead. Toolbar buttons should copy the markup of their neighbours:
+`<button type="button" data-md="…">`.
 
 Example — an analytics counter in the footer:
 
@@ -84,10 +128,39 @@ Hooks::add('post.saved', function (array $p): void {
 });
 ```
 
+### Priority — who runs first
+
+`Hooks::add()` takes an optional third argument: lower runs earlier, default
+`10`. Plugins load in alphabetical order of their folders, so never rely on that
+— set a priority when your listener must run before or after someone else's.
+Listeners with the same priority keep their registration order.
+
+```php
+Hooks::add('post.content', $fn, 5);    // early: before the default listeners
+Hooks::add('post.content', $fn);       // 10 — the usual case
+Hooks::add('post.content', $fn, 50);   // late: after everyone else
+```
+
+## Own URLs
+
+A plugin can serve its own address. Register it in `plugin.php`; the handler
+prints the response itself.
+
+```php
+PluginManager::route('robots-extra.txt', function (array $segments): void {
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "User-agent: *\nDisallow: /admin/\n";
+});
+```
+
+deeno asks plugins **only when nothing of its own matched** the address, so a
+plugin can add URLs but can never shadow an existing post, page or category.
+`$segments` is the URL split by `/`.
+
 ## Rules
 
 1. **Escape everything you output** from post data: `htmlspecialchars(..., ENT_QUOTES, 'UTF-8')`.
-2. Never output anything directly (`echo`) — only through a filter's return value, or you'll break the full-page cache and headers.
+2. Never output anything directly (`echo`) from a hook — only through a filter's return value, or you'll break the full-page cache and headers. (Inside your own route handler `echo` is expected: there you *are* the response.)
 3. Heavy work in `post.saved`/`media.uploaded` slows down saving — move it out or make it lazy.
 4. One plugin, one job. See the examples in `/plugins/`: `reading-time` (a content filter), `external-links` (HTML parsing), `lazy-images` (a minimal filter), `table-of-contents` (a heading-based TOC), `share-buttons` (share buttons + reusing `SocialIcons`).
 

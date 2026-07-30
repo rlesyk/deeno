@@ -4,6 +4,9 @@ declare(strict_types=1);
 /**
  * Генерация /rss.xml — RSS 2.0 (раздел 13 ТЗ).
  * Кэшируется через CacheManager, инвалидация — по подписи контента.
+ *
+ * Живёт внутри плагина «rss»: лента существует ровно пока плагин включён,
+ * отдельной галочки в настройках сайта больше нет.
  */
 class RssManager
 {
@@ -14,12 +17,6 @@ class RssManager
 
     public function output(): void
     {
-        if (empty($this->config['rss_enabled'])) {
-            http_response_code(404);
-            echo 'RSS is disabled.';
-            return;
-        }
-
         header('Content-Type: application/rss+xml; charset=UTF-8');
 
         $cache = new CacheManager($this->config);
@@ -40,7 +37,9 @@ class RssManager
         $title     = (string)($this->config['site_title'] ?? '');
         $desc      = (string)($this->config['site_description'] ?? '');
         $lang      = (string)($this->config['language'] ?? 'ru');
-        $limit     = max(1, (int)($this->config['rss_items'] ?? 20));
+        // Сколько записей отдавать — настройка плагина; на установках,
+        // обновлённых с 1.0, подхватывается старое значение из config.
+        $limit     = max(1, (int)PluginManager::setting('rss', 'items', $this->config['rss_items'] ?? 20));
 
         $posts = $this->cms->posts($limit);
 

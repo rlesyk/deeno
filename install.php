@@ -112,6 +112,24 @@ function environmentChecks(): array
         ? ['.htaccess на месте', 'ok', 'создан автоматически, если отсутствовал']
         : ['.htaccess не создать', 'warn', 'на Apache загрузите файл вручную; на nginx см. nginx.conf.example'];
 
+    // Защитные .htaccess в папках с данными. Они есть в дистрибутиве, но
+    // FTP-клиенты теряют dot-файлы, а при обновлении со старой версии их могло
+    // не быть вовсе — восстанавливаем молча. Без них на Apache открыты
+    // /backups/ и /users/: архив с bcrypt-хешами качается по прямой ссылке.
+    $denyAll = "<IfModule mod_authz_core.c>\n  Require all denied\n</IfModule>\n"
+        . "<IfModule !mod_authz_core.c>\n  Order Allow,Deny\n  Deny from all\n</IfModule>\n";
+    $missing = [];
+    foreach (['backups', 'users', 'cache', 'content', 'system/logs'] as $dir) {
+        $file = ROOT_DIR . '/' . $dir . '/.htaccess';
+        if (is_dir(dirname($file)) && !is_file($file)) {
+            @file_put_contents($file, $denyAll);
+            if (!is_file($file)) $missing[] = $dir;
+        }
+    }
+    $out[] = $missing === []
+        ? ['Папки данных закрыты', 'ok', '/backups/, /users/, /cache/ недоступны снаружи']
+        : ['Не закрыть папки: ' . implode(', ', $missing), 'warn', 'на nginx используйте nginx.conf.example'];
+
     // HTTP-проверка: закрыт ли config.json снаружи (главная проверка хостинга)
     [$level, $label, $why] = probeHttpProtection();
     $out[] = [$label, $level, $why];
@@ -245,9 +263,9 @@ function performInstall(array $site, array $admin): ?string
         'maintenance_mode' => false, 'maintenance_message' => '', 'order_by' => 'date',
         'category_order' => 'alpha', 'article_order' => 'manual',
         'smtp_host' => '', 'smtp_port' => 587, 'smtp_user' => '', 'smtp_pass' => '',
-        'rss_enabled' => true, 'rss_items' => 20, 'sitemap_enabled' => true,
+        'sitemap_enabled' => true,
         'logo' => '', 'favicon' => '', 'og_image' => '', 'media_max_width' => 2560,
-        'media_quality' => 82, 'plugins' => [],
+        'media_quality' => 82, 'plugins' => ['rss', 'social-links'],
     ];
     [$existing] = DataFile::readWithLegacy(ROOT_DIR . '/config');
     $config = array_merge($defaults, is_array($existing) ? $existing : [], [

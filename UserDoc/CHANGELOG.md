@@ -3,9 +3,21 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.1.0] — 2026-07-30
 
 ### Added
+
+- **Plugins v2.** Plugins can now declare **settings** in `plugin.json` — deeno
+  renders the form and adds a gear button on the Plugins page; values are kept
+  in `system/plugin-data.php`, outside the plugin folder, so reinstalling or
+  updating a plugin never wipes them (`PluginManager::setting()` reads them).
+  Plugins can also **serve their own URLs** (`PluginManager::route()`), which are
+  only consulted when nothing of deeno's own matched, so they can't shadow an
+  existing post, page or category. Hook listeners take an optional **priority**
+  (`Hooks::add($hook, $fn, 5)`), and two new filters — `admin.head` and
+  `editor.toolbar` — extend the admin panel and the editor toolbar. The stock
+  **Share buttons** plugin now uses this: the networks and the label are
+  configurable.
 
 - **Two new blog themes** in the deeno UI house style (indigo accent, Inter,
   hairlines, light/dark, RU/EN), each with a distinct idea and functionality:
@@ -26,6 +38,40 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   content, reorder, and switch their own panel theme and language. A banner
   marks the panel as a demo, blocked actions show a toast, and the login screen
   can display the demo credentials (`demo_login` / `demo_pass`).
+
+### Changed
+
+- **RSS and social links are plugins now.** The feed (`/rss.xml`, its
+  autodiscovery link and the item count) moved into the stock **RSS feed**
+  plugin, and the profile links moved into **Social links** — deeno's core no
+  longer knows about either. Both ship enabled on a fresh install, so nothing
+  changes out of the box; turn a plugin off and the feature is gone entirely,
+  settings included. Themes need no changes: `$site->rss` and `$site->social`
+  are now filled through the `site.rss` / `site.social` filters and are simply
+  empty when the plugins are off.
+
+  **Upgrading from 1.0:** enable *RSS feed* and *Social links* on the Plugins
+  page — your existing feed setting and social URLs are picked up automatically.
+  The Settings page no longer has those fields.
+
+### Security
+
+- **Backups could be downloaded by anyone who guessed the file name.** The
+  protective `.htaccess` files for `/backups/`, `/users/`, `/cache/` and
+  `/system/logs/` never made it into the distribution — `.gitignore` excluded the
+  whole contents of those folders — so a copy downloaded from GitHub had them
+  unprotected. Combined with a predictable backup name
+  (`backup-YYYY-MM-DD-HHMMSS.zip`), that let anyone fetch a full site archive,
+  including `config.php` and the `users/` files with bcrypt password hashes.
+  Backup names now carry a random suffix, the `.htaccess` files ship with the
+  distribution, and the installer recreates them if they are missing.
+
+  **What to do after updating:** check `/backups/` on your site — if
+  `https://yoursite/backups/<name>.zip` downloads instead of returning 403, move
+  the existing archives out of the web root and change your admin password, as
+  the hash may have leaked. On nginx use `nginx.conf.example`: `.htaccess` is
+  ignored there, and on hosts where nginx serves static files directly it does
+  not apply to `.zip` even on Apache.
 
 ## [1.0.0] — 2026-07-17
 

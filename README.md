@@ -5,7 +5,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/PHP-8.0%2B-777bb4" alt="PHP 8.0+">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License: MIT">
-  <img src="https://img.shields.io/badge/version-1.0.0-4F6EF7" alt="Version 1.0.0">
+  <img src="https://img.shields.io/badge/version-1.1.0-4F6EF7" alt="Version 1.1.0">
   <img src="https://img.shields.io/badge/database-none-4F6EF7" alt="No database">
 </p>
 

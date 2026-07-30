@@ -12,5 +12,5 @@ declare(strict_types=1);
  */
 
 if (!defined('DEENO_VERSION')) {
-    define('DEENO_VERSION', '1.0.0');
+    define('DEENO_VERSION', '1.1.0');
 }
