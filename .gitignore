@@ -62,6 +62,9 @@
 !/content/posts/.gitkeep
 /content/pages/*
 !/content/pages/.gitkeep
+# История версий — снимки пользовательских материалов
+/content/revisions/*
+!/content/revisions/.gitkeep
 
 # ── Системный/редакторский мусор ──
 .DS_Store

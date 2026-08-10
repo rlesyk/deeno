@@ -9,6 +9,7 @@ for building themes/plugins, see [THEME.md](THEME.md) and [PLUGINS.md](PLUGINS.m
 - [Overview (dashboard)](#overview-dashboard)
 - [Your first post](#your-first-post)
 - [Formatting text](#formatting-text)
+- [Revision history](#revision-history)
 - [Pages and menu](#pages-and-menu)
 - [Media](#media)
 - [Categories](#categories)
@@ -123,6 +124,39 @@ settings use "by position" ordering rather than by date).
 
 A draft is saved in the browser automatically (localStorage) — if the tab closed
 before saving, the editor offers to restore the unsaved text next time you open it.
+
+## Revision history
+
+Every time you save an existing post or page, the **previous** version is copied to
+`/content/revisions/` first. Nothing is overwritten silently — you can always go back.
+
+**Where to find it.** Open the material and switch to the **"History"** tab in the
+right-hand column. Each entry shows when it was saved, by whom, and how large it is.
+A new material has no history: the first entry appears after your second save.
+
+**Looking at a version.** Click an entry — you'll see its text and a short list of
+what differs from the current state (title, slug, status, category, description, and
+whether the body changed).
+
+**Restoring.** The "Restore this revision" button brings the material back to that
+version. The state you had *before* the rollback is saved to history too, so a
+rollback can itself be rolled back.
+
+A few details worth knowing:
+
+- **How many are kept** — Settings → Site → "Revisions to keep" (10 by default,
+  100 maximum). Set it to **0** to switch history off entirely; the tab disappears
+  and no snapshots are written. Older versions beyond the limit are deleted.
+- **Identical saves are skipped.** Pressing Save without changing anything does not
+  create a duplicate entry.
+- **Deleting the material deletes its history** too. If you need it back after that,
+  the archives are your safety net — history is included in backups.
+- **Pages that change their slug** take their history with them: the address changes,
+  the versions stay attached.
+- **Authors** only ever see the history of their own posts.
+
+Restoring a post that had a different slug or category creates a 301 redirect from
+the old address, exactly as editing those fields by hand would.
 
 ## Formatting text
 
@@ -313,9 +347,9 @@ For writing your own plugins, see [PLUGINS.md](PLUGINS.md).
 
 ## Backups
 
-**Settings → Backups → Create backup** — assembles a ZIP archive: posts and pages,
-media, users, installed themes, `config.php` and the category/redirect data from
-`system/`. The CMS's own code (`admin/`, `system/` except a couple of data files,
+**Settings → Backups → Create backup** — assembles a ZIP archive: posts and pages
+(with their [revision history](#revision-history)), media, users, installed themes,
+`config.php` and the category/redirect data from `system/`. The CMS's own code (`admin/`, `system/` except a couple of data files,
 `index.php`) is not in the archive — it doesn't change between your content edits and
 is updated separately (see [README → Updating](../README.md#updating)).
 
@@ -382,7 +416,9 @@ manually by position). For the `deeno-docs` documentation theme there are also *
 order** and **article order within a section** (4 options each: creation date,
 modification date, alphabet, manual by number). In "manual" mode a section's number is
 set on the category card (the "Order" field), an article's number in the post editor
-("Advanced" → "Position").
+("Advanced" → "Position"). **Revisions to keep** — how many previous versions of each
+post and page are stored (see [Revision history](#revision-history)); 0 turns the
+feature off.
 
 **The `deeno-docs` theme** (documentation/wiki): a tree of sections (categories) and
 articles (posts) on the left, "On this page" with the active heading highlighted while

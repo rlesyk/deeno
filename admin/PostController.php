@@ -11,11 +11,20 @@ defined('FFC_ADMIN') or exit;
  */
 class PostController
 {
+    private RevisionManager $revisions;
+
     public function __construct(
         private ContentManager $cms,
         private Security $security,
         private array $config,
-    ) {}
+    ) {
+        $this->revisions = new RevisionManager($config);
+    }
+
+    public function revisions(): RevisionManager
+    {
+        return $this->revisions;
+    }
 
     /**
      * Данные для формы редактора. $filename === '' — новый материал.
@@ -174,6 +183,9 @@ class PostController
 
         if ($isNew) {
             $filename = $this->uniqueFilename($date, $slug);
+        } else {
+            // Снимок предыдущего состояния — до того, как файл будет перезаписан
+            $this->revisions->snapshot('post', $filename, (string)($user['username'] ?? ''));
         }
 
         if (@file_put_contents($this->cms->postsDir() . $filename, $content, LOCK_EX) === false) {
@@ -224,6 +236,11 @@ class PostController
         $body    = str_replace("\r\n", "\n", (string)($post['content'] ?? ''));
         $content = FrontmatterSerializer::serialize($meta, $body);
 
+        // Снимок предыдущего состояния — пока старый файл ещё на месте
+        if (!$isNew) {
+            $this->revisions->snapshot('page', $filename, (string)($user['username'] ?? ''));
+        }
+
         if (@file_put_contents($pagesDir . $newFilename, $content, LOCK_EX) === false) {
             return ['error' => Lang::t('Не удалось записать файл страницы (права на /content/pages/?).')];
         }
@@ -233,11 +250,84 @@ class PostController
             $oldSlug = basename($filename, '.md');
             @unlink($pagesDir . $filename);
             (new RedirectManager())->add('/' . $oldSlug . '/', '/' . $slug . '/');
+            // История привязана к имени файла — переезжает вместе со страницей
+            $this->revisions->rename('page', $filename, $newFilename);
         }
 
         Hooks::run('post.saved', ['file' => $newFilename, 'meta' => $meta, 'new' => $isNew, 'type' => 'page']);
 
         return ['filename' => $newFilename];
+    }
+
+    // ----------------------------------------------------------------
+    // История версий
+    // ----------------------------------------------------------------
+
+    /**
+     * Вернуть материал к сохранённой версии.
+     * Текущее состояние тоже уходит в историю, поэтому откат обратим.
+     * Возвращает ['filename' => ...] или ['error' => ...].
+     */
+    public function restore(string $type, string $filename, string $id, array $user, bool $forceDraft = false): array
+    {
+        $type = $type === 'page' ? 'page' : 'post';
+
+        if (!preg_match('/^[\w\-.]+\.md$/u', $filename) || str_contains($filename, '..')) {
+            return ['error' => Lang::t('Некорректное имя файла.')];
+        }
+
+        $dir  = $type === 'page' ? $this->cms->pagesDir() : $this->cms->postsDir();
+        $path = $dir . $filename;
+        if (!is_file($path)) {
+            return ['error' => Lang::t('Материал не найден.')];
+        }
+
+        $parsed = $this->revisions->parsed($type, $filename, $id);
+        if ($parsed === null) {
+            return ['error' => Lang::t('Версия не найдена.')];
+        }
+
+        $meta = $parsed['meta'];
+        $old  = $this->loadOldMeta($path) ?? [];
+
+        // Имя файла страницы задаёт её URL — восстановление адрес не меняет
+        if ($type === 'page') {
+            $meta['slug'] = basename($filename, '.md');
+        }
+        $meta['date_modified'] = date('Y-m-d');
+
+        // Демо-режим: версия могла быть опубликованной — на витрину не пускаем
+        if ($forceDraft) {
+            $meta['status']         = 'draft';
+            $meta['scheduled_date'] = '';
+        }
+
+        // Author правит только под своим именем (чужой материал ему не отдадут)
+        if (($user['role'] ?? '') === 'author') {
+            $meta['author'] = (string)($user['username'] ?? '');
+        }
+
+        // Текущее состояние — в историю, иначе откат затрёт его безвозвратно
+        $this->revisions->snapshot($type, $filename, (string)($user['username'] ?? ''));
+
+        $content = FrontmatterSerializer::serialize($meta, $parsed['body']);
+        if (@file_put_contents($path, $content, LOCK_EX) === false) {
+            return ['error' => Lang::t('Не удалось записать файл.')];
+        }
+
+        // У поста URL зависит от slug/категории в шапке — как и при обычном
+        // сохранении, старый адрес отправляем 301-м на новый
+        if ($type === 'post') {
+            $oldUrl = '/' . (($old['category'] ?? '') !== '' ? $old['category'] : Post::DEFAULT_CATEGORY) . '/' . ($old['slug'] ?? '') . '/';
+            $newUrl = '/' . (($meta['category'] ?? '') !== '' ? $meta['category'] : Post::DEFAULT_CATEGORY) . '/' . ($meta['slug'] ?? '') . '/';
+            if ($oldUrl !== $newUrl && ($old['slug'] ?? '') !== '' && ($meta['slug'] ?? '') !== '') {
+                (new RedirectManager())->add($oldUrl, $newUrl);
+            }
+        }
+
+        Hooks::run('post.saved', ['file' => $filename, 'meta' => $meta, 'new' => false, 'type' => $type, 'restored' => $id]);
+
+        return ['filename' => $filename];
     }
 
     // ----------------------------------------------------------------

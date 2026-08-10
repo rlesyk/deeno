@@ -261,7 +261,7 @@ function performInstall(array $site, array $admin): ?string
         'date_format' => 'd.m.Y', 'timezone' => 'UTC', 'admin_path' => 'admin',
         'installed' => false, 'debug' => false, 'cache_enabled' => true,
         'maintenance_mode' => false, 'maintenance_message' => '', 'order_by' => 'date',
-        'category_order' => 'alpha', 'article_order' => 'manual',
+        'category_order' => 'alpha', 'article_order' => 'manual', 'revisions_keep' => 10,
         'smtp_host' => '', 'smtp_port' => 587, 'smtp_user' => '', 'smtp_pass' => '',
         'sitemap_enabled' => true,
         'logo' => '', 'favicon' => '', 'og_image' => '', 'media_max_width' => 2560,

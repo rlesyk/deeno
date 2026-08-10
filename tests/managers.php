@@ -892,6 +892,139 @@ eq(['y', 'z', 'x'], array_map(fn($p) => $p->slug, ContentManager::orderPostsBy($
 eq(['y', 'x', 'z'], array_map(fn($p) => $p->slug, ContentManager::orderPostsBy($list, 'alpha')), 'orderPostsBy alpha: Альфа<Бета<Гамма');
 
 // ────────────────────────────────────────────────────────────
+section('RevisionManager — история версий');
+
+$revCfg = $cfg + ['revisions_keep' => 3];
+$rm     = new RevisionManager($revCfg);
+$revDir = ROOT_DIR . '/content/revisions/posts/';
+
+ok($rm->enabled(), 'история включена при revisions_keep > 0');
+ok(!(new RevisionManager($cfg + ['revisions_keep' => 0]))->enabled(), 'revisions_keep = 0 выключает историю');
+eq(10, (new RevisionManager([]))->keep(), 'без настройки — 10 версий по умолчанию');
+eq(0, RevisionManager::normalizeKeep(-5), 'отрицательное значение зажимается в 0');
+eq(RevisionManager::MAX_KEEP, RevisionManager::normalizeKeep(9999), 'слишком большое значение зажимается в MAX_KEEP');
+eq(10, RevisionManager::normalizeKeep('мусор'), 'нечисловое значение → дефолт');
+
+writePost('rev-test', ['title' => 'Версия 1', 'status' => 'draft'], 'Тело первой версии.');
+$id1 = $rm->snapshot('post', 'rev-test.md', 'admin');
+ok($id1 !== null, 'snapshot(): снимок существующего поста создан');
+eq(1, count($rm->all('post', 'rev-test.md')), 'история: одна версия');
+
+// Тот же файл без изменений — дубликат не пишем
+ok($rm->snapshot('post', 'rev-test.md', 'admin') === null, 'snapshot(): неизменившийся файл не дублируется');
+eq(1, count($rm->all('post', 'rev-test.md')), 'история: дубликат не добавился');
+
+$restored = $rm->read('post', 'rev-test.md', $id1);
+ok($restored !== null && str_contains($restored, 'Тело первой версии.'), 'read(): содержимое версии читается целиком');
+$parsed = $rm->parsed('post', 'rev-test.md', $id1);
+eq('Версия 1', (string)($parsed['meta']['title'] ?? ''), 'parsed(): YAML-шапка версии разбирается');
+
+// Глубина хранения: при keep = 3 остаются три свежие версии
+foreach (['Версия 2', 'Версия 3', 'Версия 4', 'Версия 5'] as $i => $title) {
+    writePost('rev-test', ['title' => $title, 'status' => 'draft'], "Тело: $title.");
+    // Секунда — минимальный шаг в id, иначе снимки склеятся в одну секунду
+    $rm->snapshot('post', 'rev-test.md', 'admin');
+}
+$kept = $rm->all('post', 'rev-test.md');
+eq(3, count($kept), 'prune(): хранятся только последние keep версий');
+ok(count(glob($revDir . 'rev-test/*.md') ?: []) === 3, 'prune(): лишние файлы удалены с диска');
+
+$titles = array_map(fn($r) => (string)($rm->parsed('post', 'rev-test.md', $r['id'])['meta']['title'] ?? ''), $kept);
+eq('Версия 4', $titles[0], 'all(): свежая версия первая');
+ok(!in_array('Версия 1', $titles, true), 'вытесненная версия из истории убрана');
+
+$meta = $kept[0];
+ok($meta['time'] > 0, 'all(): время версии разобрано из id');
+eq('admin', $meta['author'], 'all(): автор версии разобран из id');
+ok($meta['size'] > 0, 'all(): размер версии посчитан');
+
+// Путь и id не должны выводить за пределы каталога истории.
+// Имя с «../» не отвергается, а нормализуется до basename — проверяем, что
+// снимок лёг ВНУТРИ хранилища, а рядом с /content/ ничего не появилось.
+writePost('normalize-me', ['title' => 'Нормализация', 'status' => 'draft'], 'Тело.');
+ok($rm->snapshot('post', '../../normalize-me.md', 'admin') !== null, 'snapshot(): имя с «../» приводится к basename и снимок делается');
+ok(is_dir($revDir . 'normalize-me'), 'snapshot(): снимок лёг внутрь хранилища истории');
+ok(!is_dir(ROOT_DIR . '/content/normalize-me') && !is_dir(dirname(ROOT_DIR) . '/normalize-me'), 'snapshot(): каталогов вне хранилища не создано');
+eq(1, count($rm->all('post', 'normalize-me.md')), 'история доступна по нормальному имени');
+$rm->forget('post', 'normalize-me.md');
+
+// id с «../» не должен доставать реально существующий файл по соседству
+file_put_contents(ROOT_DIR . '/content/revisions/posts/secret.md', 'СЕКРЕТ');
+ok(is_file(ROOT_DIR . '/content/revisions/posts/secret.md'), 'фикстура: файл рядом с каталогом версий создан');
+ok($rm->read('post', 'rev-test.md', '../secret') === null, 'read(): id с «../» не достаёт файл вне каталога версий');
+ok($rm->read('post', 'rev-test.md', '20260101-000000-000/../../secret') === null, 'read(): traversal за валидным префиксом id отклонён');
+@unlink(ROOT_DIR . '/content/revisions/posts/secret.md');
+
+// Тип материала ограничен posts|pages: чужой каталог не читаем и не создаём
+@mkdir(ROOT_DIR . '/content/evil-type', 0755, true);
+file_put_contents(ROOT_DIR . '/content/evil-type/x.md', FrontmatterSerializer::serialize(['title' => 'X'], 'тело'));
+ok($rm->snapshot('evil-type', 'x.md', 'admin') === null, 'snapshot(): неизвестный тип отклонён');
+ok(!is_dir(ROOT_DIR . '/content/revisions/evil-type'), 'snapshot(): хранилище для чужого типа не создано');
+ok($rm->read('evil-type', 'x.md', $id1) === null, 'read(): неизвестный тип отклонён');
+ok($rm->snapshot('post', 'net-takogo.md', 'admin') === null, 'snapshot(): несуществующий файл → null');
+
+// Страница сменила slug — история переезжает вместе с файлом
+writePage('staraya', ['title' => 'Старая', 'status' => 'published'], 'Тело страницы.');
+$rm->snapshot('page', 'staraya.md', 'admin');
+eq(1, count($rm->all('page', 'staraya.md')), 'история страницы создана');
+ok($rm->rename('page', 'staraya.md', 'novaya.md'), 'rename(): история переехала под новое имя');
+eq(0, count($rm->all('page', 'staraya.md')), 'rename(): под старым именем истории нет');
+eq(1, count($rm->all('page', 'novaya.md')), 'rename(): под новым именем история на месте');
+
+ok($rm->size() > 0, 'size(): история занимает место на диске');
+ok($rm->forget('post', 'rev-test.md'), 'forget(): история материала удалена');
+eq(0, count($rm->all('post', 'rev-test.md')), 'forget(): версий не осталось');
+ok(!is_dir($revDir . 'rev-test'), 'forget(): каталог истории удалён');
+
+// ── Интеграция с PostController: снимок при сохранении и восстановление ──
+section('PostController — снимки версий и восстановление');
+
+$pcRev = new PostController($cms, new Security($revCfg), $revCfg);
+$created = $pcRev->save(['type' => 'post', 'title' => 'Материал с историей', 'status' => 'draft', 'content' => 'Первый текст.'], $admin);
+$revFile = (string)($created['filename'] ?? '');
+
+ok($revFile !== '', 'пост создан');
+eq(0, count($pcRev->revisions()->all('post', $revFile)), 'у нового поста истории нет');
+
+$pcRev->save(['type' => 'post', 'file' => $revFile, 'title' => 'Материал с историей', 'status' => 'draft', 'content' => 'Второй текст.'], $admin);
+$revs = $pcRev->revisions()->all('post', $revFile);
+eq(1, count($revs), 'сохранение существующего поста кладёт прежнюю версию в историю');
+ok(str_contains((string)$pcRev->revisions()->read('post', $revFile, $revs[0]['id']), 'Первый текст.'), 'в истории лежит именно ПРЕЖНИЙ текст');
+ok(str_contains((string)file_get_contents($cms->postsDir() . $revFile), 'Второй текст.'), 'в живом файле — новый текст');
+
+$back = $pcRev->restore('post', $revFile, $revs[0]['id'], $admin);
+ok(!isset($back['error']), 'restore(): версия восстановлена без ошибки');
+ok(str_contains((string)file_get_contents($cms->postsDir() . $revFile), 'Первый текст.'), 'restore(): текст вернулся к прежней версии');
+eq(2, count($pcRev->revisions()->all('post', $revFile)), 'restore(): текущее состояние тоже ушло в историю (откат обратим)');
+
+ok(isset($pcRev->restore('post', $revFile, 'net-takoy-versii', $admin)['error']), 'restore(): несуществующая версия → ошибка');
+ok(isset($pcRev->restore('post', '../../evil.md', $revs[0]['id'], $admin)['error']), 'restore(): path traversal → ошибка');
+ok(isset($pcRev->restore('post', 'net-takogo-fayla.md', $revs[0]['id'], $admin)['error']), 'restore(): нет материала → ошибка');
+
+// Демо-режим: восстановленная версия не должна попасть на публичный фронт.
+// Сначала пост становится published, затем уходит в draft — тогда САМАЯ СВЕЖАЯ
+// версия в истории именно published, её и восстанавливаем.
+$statusInFile = fn(): string => (string)(FrontmatterParser::parse((string)file_get_contents($cms->postsDir() . $revFile))['meta']['status'] ?? '');
+$pcRev->save(['type' => 'post', 'file' => $revFile, 'title' => 'Материал с историей', 'status' => 'published', 'content' => 'Публичный текст.'], $admin);
+$pcRev->save(['type' => 'post', 'file' => $revFile, 'title' => 'Материал с историей', 'status' => 'draft', 'content' => 'Черновой текст.'], $admin);
+$pubRev = $pcRev->revisions()->all('post', $revFile)[0]['id'];
+eq('published', (string)($pcRev->revisions()->parsed('post', $revFile, $pubRev)['meta']['status'] ?? ''), 'в истории лежит опубликованная версия');
+
+$pcRev->restore('post', $revFile, $pubRev, $admin);
+eq('published', $statusInFile(), 'обычное восстановление возвращает статус версии как есть');
+
+$pcRev->save(['type' => 'post', 'file' => $revFile, 'title' => 'Материал с историей', 'status' => 'draft', 'content' => 'Снова черновик.'], $admin);
+$pubRev2 = $pcRev->revisions()->all('post', $revFile)[0]['id'];
+$pcRev->restore('post', $revFile, $pubRev2, $admin, true);
+eq('draft', $statusInFile(), 'restore() в демо-режиме принудительно ставит draft');
+
+// История выключена настройкой — снимки не создаются
+$pcOff = new PostController($cms, new Security($cfg + ['revisions_keep' => 0]), $cfg + ['revisions_keep' => 0]);
+$offFile = (string)($pcOff->save(['type' => 'post', 'title' => 'Без истории', 'status' => 'draft', 'content' => 'a'], $admin)['filename'] ?? '');
+$pcOff->save(['type' => 'post', 'file' => $offFile, 'title' => 'Без истории', 'status' => 'draft', 'content' => 'b'], $admin);
+eq(0, count($pcOff->revisions()->all('post', $offFile)), 'при revisions_keep = 0 снимки не создаются');
+
+// ────────────────────────────────────────────────────────────
 echo "\n";
 if ($GLOBALS['__f'] === 0) {
     echo "\033[32mManagers: все {$GLOBALS['__t']} проверок прошли ✓\033[0m\n";

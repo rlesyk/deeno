@@ -804,8 +804,11 @@ if ($action === 'posts' || $action === 'pages') {
                 ? ($type === 'page' ? t('Новая страница') : t('Новый пост'))
                 : t('Редактирование'),
             'saved'     => isset($_GET['saved']),
+            'restored'  => isset($_GET['restored']),
             'editErr'   => t((string)($_GET['msg'] ?? '')),
             'mediaList' => (new MediaManager())->all(),
+            'revList'   => $data['isNew'] ? [] : $controller->revisions()->all($type, $data['filename']),
+            'revKeep'   => $controller->revisions()->keep(),
         ]);
         exit;
     }
@@ -847,9 +850,59 @@ if ($action === 'posts' || $action === 'pages') {
 
         $ok = $type === 'page' ? $cms->deletePageFile($file) : $cms->deletePostFile($file);
         if ($ok) {
+            // Материала нет — его история версий тоже больше не нужна
+            $controller->revisions()->forget($type, $file);
             Hooks::run('post.deleted', ['file' => $file, 'type' => $type]);
         }
         adminRedirect($adminBase . $action . '/?' . ($ok ? 'deleted=1' : 'error=1'));
+    }
+
+    // История версий: просмотр одной сохранённой версии
+    if ($sub === 'revision') {
+        $file = (string)($_GET['file'] ?? '');
+        $revId = (string)($_GET['rev'] ?? '');
+
+        // Author смотрит историю только своих постов
+        requireOwnPost($file, $user, $type, $cms);
+
+        $data = $controller->editorData($file, $user, $type);
+        if (!empty($data['denied']) || $data['filename'] === '') {
+            adminErrorPage(403, t('Доступ запрещён'), t('У вас нет прав для этого действия.'));
+        }
+
+        $revision = $controller->revisions()->parsed($type, $file, $revId);
+        if ($revision === null) {
+            adminErrorPage(404, t('Версия не найдена.'), t('Возможно, она вытеснена более новыми.'));
+        }
+
+        adminRender('revision', $common + [
+            'title'    => t('Версия материала'),
+            'kind'     => $action,
+            'file'     => $file,
+            'revId'    => $revId,
+            'revMeta'  => $revision['meta'],
+            'revBody'  => $revision['body'],
+            'current'  => ['meta' => $data['meta'], 'body' => $data['body']],
+            'revList'  => $controller->revisions()->all($type, $file),
+        ]);
+        exit;
+    }
+
+    // Восстановление версии (POST + CSRF)
+    if ($sub === 'restore' && $isPost) {
+        if (!$security->verifyCsrf($_POST['csrf'] ?? null)) {
+            csrfFail();
+        }
+        $file = (string)($_POST['file'] ?? '');
+        requireOwnPost($file, $user, $type, $cms);
+
+        // В демо восстановленная версия уходит в draft — как и обычное сохранение
+        $result = $controller->restore($type, $file, (string)($_POST['rev'] ?? ''), $user, isDemoMode());
+        if (isset($result['error'])) {
+            adminRedirect($adminBase . $action . '/edit/?file=' . urlencode($file)
+                . '&msg=' . urlencode($result['error']));
+        }
+        adminRedirect($adminBase . $action . '/edit/?file=' . urlencode($result['filename']) . '&restored=1');
     }
 
     // Список страниц (фильтры: статус + поиск по заголовку/slug)
@@ -1464,6 +1517,7 @@ if ($action === 'settings') {
             'order_by'            => ($_POST['order_by'] ?? '') === 'position' ? 'position' : 'date',
             'category_order'      => in_array($_POST['category_order'] ?? '', ['manual', 'alpha', 'created', 'modified'], true) ? (string)$_POST['category_order'] : 'alpha',
             'article_order'       => in_array($_POST['article_order'] ?? '', ['manual', 'alpha', 'created', 'modified'], true) ? (string)$_POST['article_order'] : 'manual',
+            'revisions_keep'      => RevisionManager::normalizeKeep($_POST['revisions_keep'] ?? RevisionManager::DEFAULT_KEEP),
             'maintenance_mode'    => !empty($_POST['maintenance_mode']),
             'maintenance_message' => trim((string)($_POST['maintenance_message'] ?? '')),
             'cache_enabled'       => !empty($_POST['cache_enabled']),

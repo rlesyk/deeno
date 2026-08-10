@@ -25,7 +25,8 @@ locked inside a database you can't reach.
 - **Yours, in plain files.** Content is Markdown, settings are plain files. Move it,
   copy it, edit it in Notepad — it's just files.
 - **Everything included.** Editor, media library, SEO, RSS, search, dark mode,
-  statistics, one-click backups, roles, themes and plugins — out of the box.
+  statistics, revision history, one-click backups, roles, themes and plugins —
+  out of the box.
 - **Fast by default.** Full-page cache, optimized images, no bloat.
 
 ## Get started

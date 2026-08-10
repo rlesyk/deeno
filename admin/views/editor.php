@@ -28,7 +28,9 @@ if ($curCategory !== '' && !isset($categoryOptions[$curCategory])) {
 }
 ?>
 
-<?php if ($saved): ?>
+<?php if (!empty($restored)): ?>
+  <div class="alert alert--success" data-toast><?= e(t('Версия восстановлена.')) ?></div>
+<?php elseif ($saved): ?>
   <div class="alert alert--success" data-toast><?= e(t('Сохранено.')) ?></div>
 <?php endif; ?>
 <?php if ($editErr !== ''): ?>
@@ -135,6 +137,9 @@ if ($curCategory !== '' && !isset($categoryOptions[$curCategory])) {
         <button type="button" class="tabs__btn active" data-tab="params"><?= e(t('Параметры')) ?></button>
         <button type="button" class="tabs__btn" data-tab="seo">SEO</button>
         <button type="button" class="tabs__btn" data-tab="custom"><?= e(t('Поля')) ?></button>
+        <?php if (!$isNew && ($revKeep ?? 0) > 0): ?>
+          <button type="button" class="tabs__btn" data-tab="history"><?= e(t('История')) ?></button>
+        <?php endif; ?>
       </div>
 
       <div class="tab-pane" id="tab-params">
@@ -278,6 +283,31 @@ if ($curCategory !== '' && !isset($categoryOptions[$curCategory])) {
         </div>
         <button type="button" class="btn btn--small btn--secondary" id="cf-add"><?= e(t('+ Добавить поле')) ?></button>
       </div>
+
+      <?php if (!$isNew && ($revKeep ?? 0) > 0): ?>
+      <div class="tab-pane" id="tab-history" hidden>
+        <?php if (($revList ?? []) === []): ?>
+          <p class="muted" style="margin-top:0">
+            <?= e(t('Пока нет сохранённых версий: первая появится после следующего сохранения.')) ?>
+          </p>
+        <?php else: ?>
+          <ul class="rev-list">
+            <?php foreach ($revList as $rev): ?>
+              <li class="rev-list__item">
+                <a href="<?= e($adminBase . ($isPage ? 'pages' : 'posts') . '/revision/?file=' . urlencode($filename) . '&rev=' . urlencode($rev['id'])) ?>">
+                  <span class="rev-list__time"><?= e(date('d.m.Y H:i', (int)$rev['time'])) ?></span>
+                  <span class="rev-list__meta">
+                    <?php if ($rev['author'] !== ''): ?><?= e($rev['author']) ?> · <?php endif; ?>
+                    <?= e(number_format($rev['size'] / 1024, 1, '.', ' ')) ?> <?= e(t('КБ')) ?>
+                  </span>
+                </a>
+              </li>
+            <?php endforeach; ?>
+          </ul>
+        <?php endif; ?>
+        <p class="muted"><?= e(sprintf(t('Хранятся последние %d версий.'), (int)$revKeep)) ?></p>
+      </div>
+      <?php endif; ?>
     </div>
 
   </aside>

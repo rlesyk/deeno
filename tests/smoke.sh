@@ -339,6 +339,72 @@ else
     FAIL=$((FAIL + 1)); printf '  \033[31m✗ админка потеряла свой CSP с nonce\033[0m\n'
 fi
 
+echo "История версий:"
+# Первое сохранение существующего поста должно унести прежнюю версию в историю.
+CSRF="$(curl -s -b "$JAR" "$BASE/admin/posts/edit/?file=hello.md" | grep -oE 'name="csrf" value="[^"]+"' | head -1 | sed 's/.*value="//; s/"//')"
+curl -s -b "$JAR" -o /dev/null -X POST "$BASE/admin/posts/save/" \
+    --data-urlencode "csrf=$CSRF" --data-urlencode "file=hello.md" \
+    --data-urlencode "title=Привет мир" --data-urlencode "slug=hello" \
+    --data-urlencode "category=novosti" --data-urlencode "status=published" \
+    --data-urlencode "date=2026-01-01" --data-urlencode "content=Текст после первой правки."
+
+REV_ID="$(ls -1 "$TMP/content/revisions/posts/hello/" 2>/dev/null | head -1 | sed 's/\.md$//')"
+if [ -n "$REV_ID" ]; then
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m версия создана при сохранении (%s)\n' "$REV_ID"
+else
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ версия при сохранении не создана\033[0m\n'
+fi
+
+if grep -q 'Тело опубликованного поста' "$TMP/content/revisions/posts/hello/$REV_ID.md" 2>/dev/null; then
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m в версии лежит ПРЕЖНИЙ текст\n'
+else
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ в версии не прежний текст\033[0m\n'
+fi
+
+check "просмотр версии → 200"             200 -b "$JAR" "$BASE/admin/posts/revision/?file=hello.md&rev=$REV_ID"
+check "несуществующая версия → 404"       404 -b "$JAR" "$BASE/admin/posts/revision/?file=hello.md&rev=20990101-000000-000-x"
+check "восстановление без CSRF → 403"     403 -b "$JAR" -X POST "$BASE/admin/posts/restore/" \
+    --data-urlencode "file=hello.md" --data-urlencode "rev=$REV_ID"
+
+CSRF="$(curl -s -b "$JAR" "$BASE/admin/posts/edit/?file=hello.md" | grep -oE 'name="csrf" value="[^"]+"' | head -1 | sed 's/.*value="//; s/"//')"
+curl -s -b "$JAR" -o /dev/null -X POST "$BASE/admin/posts/restore/" \
+    --data-urlencode "csrf=$CSRF" --data-urlencode "file=hello.md" --data-urlencode "rev=$REV_ID"
+if grep -q 'Тело опубликованного поста' "$TMP/content/posts/hello.md"; then
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m восстановление вернуло прежний текст в файл\n'
+else
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ восстановление не изменило файл\033[0m\n'
+fi
+# Откат обратим: состояние до отката тоже должно уйти в историю
+if [ "$(ls -1 "$TMP/content/revisions/posts/hello/" | wc -l | tr -d ' ')" = "2" ]; then
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m состояние до отката сохранено (откат обратим)\n'
+else
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ состояние до отката не сохранено\033[0m\n'
+fi
+
+# Удаление материала уносит и его историю с диска.
+# Сначала правим черновик, чтобы история у него появилась.
+CSRF="$(curl -s -b "$JAR" "$BASE/admin/posts/edit/?file=draft.md" | grep -oE 'name="csrf" value="[^"]+"' | head -1 | sed 's/.*value="//; s/"//')"
+curl -s -b "$JAR" -o /dev/null -X POST "$BASE/admin/posts/save/" \
+    --data-urlencode "csrf=$CSRF" --data-urlencode "file=draft.md" \
+    --data-urlencode "title=Черновик" --data-urlencode "slug=secret-draft" \
+    --data-urlencode "status=draft" --data-urlencode "date=2026-01-01" \
+    --data-urlencode "content=Черновик после правки."
+if [ -d "$TMP/content/revisions/posts/draft" ]; then
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m у черновика появилась история\n'
+else
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ история черновика не создана\033[0m\n'
+fi
+
+CSRF="$(curl -s -b "$JAR" "$BASE/admin/posts/" | grep -oE 'name="csrf" value="[^"]+"' | head -1 | sed 's/.*value="//; s/"//')"
+curl -s -b "$JAR" -o /dev/null -X POST "$BASE/admin/posts/delete/" \
+    --data-urlencode "csrf=$CSRF" --data-urlencode "file=draft.md"
+if [ ! -d "$TMP/content/revisions/posts/draft" ]; then
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m удаление материала унесло его историю с диска\n'
+else
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ история удалённого материала осталась на диске\033[0m\n'
+fi
+check "история удалённого материала недоступна" 403 -b "$JAR" "$BASE/admin/posts/revision/?file=draft.md&rev=$REV_ID"
+
 echo "Разграничение прав (роль author):"
 JAR2="$TMP/cookies-author.txt"
 CSRF_A="$(curl -s -c "$JAR2" "$BASE/admin/" | grep -oE 'name="csrf" value="[^"]+"' | head -1 | sed 's/.*value="//; s/"//')"

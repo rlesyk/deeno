@@ -7,6 +7,16 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Revision history for posts and pages.** Every save of an existing material
+  copies the previous version to `/content/revisions/` first. The editor gets a
+  **"History"** tab: when a version was saved, by whom and how large it is; open
+  one to see its text and what differs from the current state, then restore it in
+  one click. The state before a rollback is saved too, so a rollback can itself
+  be rolled back. Depth is set in Settings → Site → **"Revisions to keep"**
+  (10 by default, 100 max, **0 turns the feature off**); identical saves don't
+  create duplicates, deleting a material deletes its history, a page that changes
+  its slug takes its history along, and authors only see their own posts'
+  history. History is included in backups.
 - **Data migrations between versions.** deeno now records the data version in
   `config.php` (`current_build`) and, on the first admin login after the files
   are updated, quietly brings the installation up to date — a toast confirms it

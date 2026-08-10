@@ -156,6 +156,12 @@ $canEditSite = !empty($isSiteAdmin);
           <?php endforeach; ?>
         </select>
       </label>
+      <label class="field">
+        <span class="field__label"><?= e(t('Хранить версий материала')) ?></span>
+        <input type="number" name="revisions_keep" min="0" max="<?= RevisionManager::MAX_KEEP ?>"
+               value="<?= $c('revisions_keep', (string)RevisionManager::DEFAULT_KEEP) ?>">
+        <span class="field__hint"><?= e(t('Перед каждым сохранением прежняя версия уходит в историю. 0 — не вести историю.')) ?></span>
+      </label>
     </div>
     <?php /* Личные настройки — под «Сайтом», в той же левой колонке */ ?>
     <?php $panelCard(); ?>
