@@ -12,6 +12,10 @@ $statuses = statusLabels();
 
 <?php if ($deleted): ?>
   <div class="alert alert--success" data-toast><?= e(t('Пост удалён.')) ?></div>
+<?php elseif (!empty($archived)): ?>
+  <div class="alert alert--success" data-toast><?= e(t('Пост убран в архив.')) ?></div>
+<?php elseif (!empty($unarchived)): ?>
+  <div class="alert alert--success" data-toast><?= e(t('Пост возвращён из архива в черновики.')) ?></div>
 <?php elseif ($error): ?>
   <div class="alert alert--danger" data-toast><?= e(t('Не удалось удалить пост.')) ?></div>
 <?php endif; ?>
@@ -64,6 +68,14 @@ $statuses = statusLabels();
           <td class="table__actions">
             <a class="btn btn--small btn--secondary"
                href="<?= e($adminBase) ?>posts/edit/?file=<?= e(urlencode(basename($p->filePath))) ?>"><?= icon('pen') ?></a>
+            <?php // Архив — не удаление: материал остаётся, но исчезает с сайта ?>
+            <?php $inArchive = $p->status === 'archived'; ?>
+            <form method="post" action="<?= e($adminBase) ?>posts/archive/" class="table__inline-form">
+              <?= $security->csrfField() ?>
+              <input type="hidden" name="file" value="<?= e(basename($p->filePath)) ?>">
+              <button class="btn btn--small btn--secondary"
+                      title="<?= e($inArchive ? t('Вернуть из архива в черновики') : t('Убрать в архив')) ?>"><?= icon($inArchive ? 'download' : 'archive') ?></button>
+            </form>
             <button class="btn btn--small btn--danger js-delete"
                     data-file="<?= e(basename($p->filePath)) ?>"
                     data-title="<?= e($p->title ?: $p->slug) ?>"><?= icon('trash') ?></button>

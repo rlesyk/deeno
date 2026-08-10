@@ -642,6 +642,9 @@ a.sidebar__user:hover { color: var(--ink); }
 }
 .table__actions .btn { vertical-align: middle; }
 .table__actions .btn + .btn { margin-left: 4px; }
+/* Действие-форма (архив) стоит в одном ряду с кнопками-ссылками */
+.table__inline-form { display: inline-block; vertical-align: middle; margin-left: 4px; }
+.table__actions .table__inline-form + .btn { margin-left: 4px; }
 /* Столбец действий — по правому краю (шапка и кнопки), как последний столбец */
 .table th.table__actions-head,
 .table td.table__actions { text-align: right; }
@@ -666,6 +669,7 @@ a.sidebar__user:hover { color: var(--ink); }
 .badge--scheduled { background: var(--warn-soft); color: var(--warn-deep); }
 .badge--draft     { background: var(--frost); color: var(--mid-gray); }
 .badge--unlisted  { background: var(--frost); color: var(--steel); }
+.badge--archived  { background: var(--frost); color: var(--mid-gray); }
 .badge--admin     { background: var(--accent-soft); color: var(--accent); }
 .badge--editor    { background: var(--tint-blue); color: #1d4ed8; }
 .badge--author    { background: var(--frost); color: var(--mid-gray); }

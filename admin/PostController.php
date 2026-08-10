@@ -115,7 +115,7 @@ class PostController
     {
         // Статус берётся напрямую из селекта — единственный источник правды.
         $status  = (string)($post['status'] ?? 'draft');
-        $allowed = ['published', 'draft', 'sticky', 'scheduled', 'unlisted'];
+        $allowed = ['published', 'draft', 'sticky', 'scheduled', 'unlisted', 'archived'];
         if (!in_array($status, $allowed, true)) $status = 'draft';
 
         $date = trim((string)($post['date'] ?? ''));

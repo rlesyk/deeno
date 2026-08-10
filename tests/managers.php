@@ -1025,6 +1025,55 @@ $pcOff->save(['type' => 'post', 'file' => $offFile, 'title' => 'Без исто�
 eq(0, count($pcOff->revisions()->all('post', $offFile)), 'при revisions_keep = 0 снимки не создаются');
 
 // ────────────────────────────────────────────────────────────
+section('Архивация статей — статус archived');
+
+// Архивный пост не удалён, но исчезает отовсюду: ленты, агрегаты, поиск,
+// RSS/Sitemap (они ходят через posts()) и прямая ссылка (404 через Router).
+writePost('arhivnyy', [
+    'title' => 'Архивная статья', 'status' => 'archived',
+    'category' => 'novosti', 'tags' => ['arhiv-tag'], 'date' => '2026-01-01',
+], 'Тело архивной статьи.');
+$cmsArc = new ContentManager($cfg);
+
+$feedSlugs = array_map(fn(Post $p) => $p->slug, $cmsArc->posts());
+ok(!in_array('arhivnyy', $feedSlugs, true), 'archived не попадает в ленту постов');
+ok(!isset($cmsArc->tags()['arhiv-tag']), 'archived не попадает в облако тегов');
+
+$arcPost = $cmsArc->postByFilename('arhivnyy.md');
+ok($arcPost !== null, 'archived материал НЕ удалён — файл на месте');
+ok($arcPost !== null && !$arcPost->isPubliclyVisible(), 'archived не отдаётся по прямой ссылке (404)');
+eq('archived', $arcPost?->status, 'статус в файле — archived');
+
+$adminList = array_map(fn(Post $p) => $p->slug, $cmsArc->posts(0, ['status' => 'all']));
+ok(in_array('arhivnyy', $adminList, true), 'archived виден в админском списке (status=all)');
+$onlyArchived = array_map(fn(Post $p) => $p->slug, $cmsArc->posts(0, ['status' => 'archived']));
+eq(['arhivnyy'], $onlyArchived, 'фильтр «Архив» отбирает только архивные');
+
+// Поиск не должен находить архивное
+$searchArc = new SearchManager(new ContentManager($cfg));
+$found = array_map(fn(Post $p) => $p->slug, $searchArc->search('Архивная'));
+ok(!in_array('arhivnyy', $found, true), 'archived не находится поиском по сайту');
+
+// Sitemap строится из posts() — архивного URL там быть не должно
+ob_start();
+(new SitemapManager($cfg + ['site_url' => 'https://s.ru', 'sitemap_enabled' => true, 'cache_enabled' => false], $cmsArc))->output();
+$sitemapXml = (string)ob_get_clean();
+ok(str_contains($sitemapXml, '<urlset'), 'Sitemap сгенерирован');
+ok(!str_contains($sitemapXml, '/arhivnyy/'), 'archived нет в Sitemap');
+
+// Контроллер принимает статус из селекта редактора
+$pcArc = new PostController($cmsArc, new Security($cfg), $cfg);
+$arcSaved = $pcArc->save(['type' => 'post', 'title' => 'Через редактор', 'status' => 'archived', 'content' => 'x'], $admin);
+$arcMeta = FrontmatterParser::parse((string)file_get_contents($cmsArc->postsDir() . $arcSaved['filename']))['meta'];
+eq('archived', (string)($arcMeta['status'] ?? ''), 'редактор сохраняет статус archived');
+
+// Переключение статуса делает updatePostMeta — тело материала не должно пострадать
+ok($cmsArc->updatePostMeta('arhivnyy.md', ['status' => 'draft']), 'возврат из архива: статус переписан');
+$back = $cmsArc->postByFilename('arhivnyy.md');
+eq('draft', $back?->status, 'возврат из архива даёт черновик, а не публикацию');
+ok(str_contains((string)file_get_contents($cmsArc->postsDir() . 'arhivnyy.md'), 'Тело архивной статьи.'), 'тело материала при смене статуса сохранено');
+
+// ────────────────────────────────────────────────────────────
 echo "\n";
 if ($GLOBALS['__f'] === 0) {
     echo "\033[32mManagers: все {$GLOBALS['__t']} проверок прошли ✓\033[0m\n";

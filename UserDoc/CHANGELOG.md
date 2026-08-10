@@ -7,6 +7,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Archiving posts.** A new **"Archived"** status for outdated material you don't
+  want to delete: the post disappears from feeds, categories, tags, search, RSS and
+  the sitemap, and its URL returns 404 — while the file, its media and its revision
+  history stay intact. One button in the posts list sends a post to the archive and
+  brings it back; the "Archived" filter above the list finds them. Coming back is
+  always **as a draft**, so nothing you archived long ago reappears on the site
+  without you reading it first.
 - **Revision history for posts and pages.** Every save of an existing material
   copies the previous version to `/content/revisions/` first. The editor gets a
   **"History"** tab: when a version was saved, by whom and how large it is; open

@@ -409,5 +409,10 @@
   "Пока нет сохранённых версий: первая появится после следующего сохранения.": "No revisions yet — the first one appears after your next save.",
   "Хранятся последние %d версий.": "Keeping the last %d revisions.",
   "Хранить версий материала": "Revisions to keep",
-  "Перед каждым сохранением прежняя версия уходит в историю. 0 — не вести историю.": "Before each save the previous version goes to history. 0 disables history."
+  "Перед каждым сохранением прежняя версия уходит в историю. 0 — не вести историю.": "Before each save the previous version goes to history. 0 disables history.",
+  "В архиве": "Archived",
+  "Пост убран в архив.": "Post moved to the archive.",
+  "Пост возвращён из архива в черновики.": "Post restored from the archive as a draft.",
+  "Вернуть из архива в черновики": "Restore from the archive as a draft",
+  "Убрать в архив": "Move to the archive"
 }

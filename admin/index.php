@@ -227,6 +227,7 @@ function statusLabels(bool $isPage = false): array
             'draft'     => t('Черновик'),
             'scheduled' => t('Отложен'),
             'unlisted'  => t('Вне списков'),
+            'archived'  => t('В архиве'),
         ];
 }
 
@@ -545,7 +546,9 @@ if (!isDemoMode()) {
 // ----------------------------------------------------------------
 if (isDemoMode() && $isPost) {
     $demoBlocked = [
-        'posts'      => ['delete'],
+        // archive убрал бы демо-пост с публичной витрины — это не правка своего
+        // черновика, а изменение того, что видят остальные гости
+        'posts'      => ['delete', 'archive'],
         'pages'      => ['delete'],
         'categories' => ['create', 'save', 'delete'],
         'users'      => ['save', 'delete'],
@@ -857,6 +860,35 @@ if ($action === 'posts' || $action === 'pages') {
         adminRedirect($adminBase . $action . '/?' . ($ok ? 'deleted=1' : 'error=1'));
     }
 
+    // В архив / из архива (POST + CSRF). Архивный пост не удалён, но скрыт
+    // отовсюду: из лент, RSS, Sitemap, поиска и по прямой ссылке (404).
+    if ($sub === 'archive' && $isPost && $type === 'post') {
+        if (!$security->verifyCsrf($_POST['csrf'] ?? null)) {
+            csrfFail();
+        }
+        $file = (string)($_POST['file'] ?? '');
+        requireOwnPost($file, $user, $type, $cms);
+
+        $post = $cms->postByFilename($file);
+        if ($post === null) {
+            adminRedirect($adminBase . 'posts/?error=1');
+        }
+
+        // Возврат — всегда в черновик: прежний статус мог быть published,
+        // а тихая публикация по кнопке «из архива» — сюрприз для автора
+        $toArchive = $post->status !== 'archived';
+        $newStatus = $toArchive ? 'archived' : 'draft';
+
+        // Смена статуса меняет файл — прежнее состояние в историю
+        $controller->revisions()->snapshot('post', $file, (string)($user['username'] ?? ''));
+
+        $ok = $cms->updatePostMeta($file, ['status' => $newStatus]);
+        if ($ok) {
+            Hooks::run('post.saved', ['file' => $file, 'meta' => ['status' => $newStatus], 'new' => false, 'type' => 'post']);
+        }
+        adminRedirect($adminBase . 'posts/?' . ($ok ? ($toArchive ? 'archived=1' : 'unarchived=1') : 'error=1'));
+    }
+
     // История версий: просмотр одной сохранённой версии
     if ($sub === 'revision') {
         $file = (string)($_GET['file'] ?? '');
@@ -981,6 +1013,8 @@ if ($action === 'posts' || $action === 'pages') {
         'fSearch'    => $fSearch,
         'deleted'    => isset($_GET['deleted']),
         'error'      => isset($_GET['error']),
+        'archived'   => isset($_GET['archived']),
+        'unarchived' => isset($_GET['unarchived']),
     ]);
     exit;
 }

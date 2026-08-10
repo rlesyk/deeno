@@ -84,9 +84,19 @@ post as it would look on the site (in the current theme) without saving it.
 
 **Statuses:** draft, published, sticky (always at the top of the list), scheduled
 (published automatically on the given date — a calendar with a date and time picker
-appears) and "unlisted" (available by direct link but not in archives/RSS/search —
-handy for landing pages). The save button changes its label to match the status:
-"Save", "Publish" or "Schedule".
+appears), "unlisted" (available by direct link but not in archives/RSS/search — handy
+for landing pages) and **archived** (see below). The save button changes its label to
+match the status: "Save", "Publish" or "Schedule".
+
+**Archiving.** An outdated post doesn't have to be deleted. The archive button in the
+"Actions" column (or the "Archived" status in the editor) takes it off the site
+completely: it disappears from feeds, categories, tags, search, RSS and the sitemap,
+and its address starts returning 404 — but the file, its media and its
+[revision history](#revision-history) stay where they are. Use the "Archived" filter
+above the list to find such posts. The same button brings a post back, always **as a
+draft** — so that a post you archived long ago doesn't quietly reappear on the site;
+publish it yourself once you've re-read it. Archiving applies to posts; pages only
+have draft and published.
 
 In the posts and pages list, **clicking the title** goes where the material actually
 is: a published one (including "unlisted") opens on the site in a new tab, while a

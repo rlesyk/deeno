@@ -100,6 +100,16 @@ date: 2026-01-01
 ---
 Тело опубликованного поста.
 EOF
+cat > "$TMP/content/posts/archive-me.md" <<'EOF'
+---
+title: Кандидат в архив
+slug: archive-me
+status: published
+category: novosti
+date: 2026-01-02
+---
+Этот пост уедет в архив и должен исчезнуть с сайта.
+EOF
 cat > "$TMP/content/posts/draft.md" <<'EOF'
 ---
 title: Черновик
@@ -338,6 +348,54 @@ if curl -s -D- -o /dev/null -b "$JAR" "$BASE/admin/" | grep -i '^content-securit
 else
     FAIL=$((FAIL + 1)); printf '  \033[31m✗ админка потеряла свой CSP с nonce\033[0m\n'
 fi
+
+echo "Архивация статей:"
+# hello.md опубликован и виден на сайте — убираем его в архив кнопкой из списка
+CSRF="$(curl -s -b "$JAR" "$BASE/admin/posts/" | grep -oE 'name="csrf" value="[^"]+"' | head -1 | sed 's/.*value="//; s/"//')"
+curl -s -b "$JAR" -o /dev/null -X POST "$BASE/admin/posts/archive/" \
+    --data-urlencode "csrf=$CSRF" --data-urlencode "file=archive-me.md"
+
+if grep -q 'status: archived' "$TMP/content/posts/archive-me.md"; then
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m кнопка «в архив» сменила статус в файле\n'
+else
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ статус archived в файле не выставлен\033[0m\n'
+fi
+if grep -q 'должен исчезнуть с сайта' "$TMP/content/posts/archive-me.md"; then
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m материал не удалён — тело на месте\n'
+else
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ архивация испортила тело материала\033[0m\n'
+fi
+
+check "архивный пост по прямой ссылке → 404"  404 "$BASE/novosti/archive-me/"
+if curl -s "$BASE/" | grep -q 'Кандидат в архив'; then
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ архивный пост остался в ленте на главной\033[0m\n'
+else
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m архивного поста нет в ленте на главной\n'
+fi
+if curl -s "$BASE/sitemap.xml" | grep -q '/novosti/archive-me/'; then
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ архивный пост остался в Sitemap\033[0m\n'
+else
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m архивного поста нет в Sitemap\n'
+fi
+if curl -s "$BASE/rss.xml" | grep -q '/novosti/archive-me/'; then
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ архивный пост остался в RSS\033[0m\n'
+else
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m архивного поста нет в RSS\n'
+fi
+
+check "архивация без CSRF → 403"  403 -b "$JAR" -X POST "$BASE/admin/posts/archive/" \
+    --data-urlencode "file=archive-me.md"
+
+# Возврат из архива — всегда в черновик, а не обратно в публикацию
+CSRF="$(curl -s -b "$JAR" "$BASE/admin/posts/" | grep -oE 'name="csrf" value="[^"]+"' | head -1 | sed 's/.*value="//; s/"//')"
+curl -s -b "$JAR" -o /dev/null -X POST "$BASE/admin/posts/archive/" \
+    --data-urlencode "csrf=$CSRF" --data-urlencode "file=archive-me.md"
+if grep -q 'status: draft' "$TMP/content/posts/archive-me.md"; then
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m возврат из архива даёт черновик (не тихую публикацию)\n'
+else
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ возврат из архива не дал черновик\033[0m\n'
+fi
+check "пост из архива публично недоступен (черновик) → 404"  404 "$BASE/novosti/archive-me/"
 
 echo "История версий:"
 # Первое сохранение существующего поста должно унести прежнюю версию в историю.
@@ -606,6 +664,15 @@ if [ -f "$TMP/content/posts/owned-by-admin.md" ]; then
     PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m демо: удаление поста заблокировано (файл на месте)\n'
 else
     FAIL=$((FAIL + 1)); printf '  \033[31m✗ демо: пост удалён под демо-режимом\033[0m\n'
+fi
+
+# Запрещённое: архивация. Гость убрал бы чужой пост с публичной витрины.
+curl -s -o /dev/null -b "$JAR" -X POST "$BASE/admin/posts/archive/" \
+    --data-urlencode "csrf=$CSRF" --data-urlencode "file=owned-by-admin.md"
+if grep -q 'status: published' "$TMP/content/posts/owned-by-admin.md"; then
+    PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m демо: архивация заблокирована (пост остался опубликованным)\n'
+else
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗ демо: пост убран в архив под демо-режимом\033[0m\n'
 fi
 
 # Разрешённое, но принудительно в draft: гость шлёт status=published, а файл
