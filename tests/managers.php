@@ -544,13 +544,80 @@ eq(null, $cache->get('k1', 'sig-b'), 'get() с чужой подписью → n
 ok(!(new CacheManager(['cache_enabled' => false]))->isEnabled(), 'isEnabled() false при выключенном кэше');
 
 // ────────────────────────────────────────────────────────────
+section('Migrator — обновление данных между версиями');
+
+// Код обновляют заменой файлов, данные остаются от старой версии. Проверяем
+// сценарий 1.0.0 → 1.1.0: RSS и соцсети уехали в плагины, и без миграции лента
+// и иконки молча исчезли бы с сайта.
+if (!defined('DEENO_VERSION')) define('DEENO_VERSION', '1.1.0');
+@mkdir(ROOT_DIR . '/plugins/rss', 0755, true);
+@mkdir(ROOT_DIR . '/plugins/social-links', 0755, true);
+
+$writeCfg = function (array $cfg): void {
+    DataFile::writeMigrating(ROOT_DIR . '/config', $cfg);
+};
+$readCfg = function (): array {
+    [$c] = DataFile::readWithLegacy(ROOT_DIR . '/config');
+    return is_array($c) ? $c : [];
+};
+
+// Установка с 1.0: current_build нет, RSS был включён, соцсети заполнены
+$writeCfg(['site_title' => 'Old', 'rss_enabled' => true, 'plugins' => [],
+           'social' => ['telegram' => 'https://t.me/x', 'vk' => '']]);
+$done = Migrator::run($readCfg());
+$after = $readCfg();
+eq(['1.1.0'], $done, 'выполнен шаг 1.1.0');
+ok(in_array('rss', (array)$after['plugins'], true), 'RSS-плагин включён — лента не пропала');
+ok(in_array('social-links', (array)$after['plugins'], true), 'плагин соцсетей включён — иконки не пропали');
+eq(DEENO_VERSION, $after['current_build'] ?? '', 'current_build проставлен');
+ok(is_file(ROOT_DIR . '/backups/.htaccess'), 'миграция вернула защитный .htaccess');
+
+// Повторный запуск ничего не делает: шаги обязаны быть идемпотентными
+$secondRun = Migrator::run($readCfg());
+eq([], $secondRun, 'повторный запуск: обновлять нечего');
+eq(2, count((array)$readCfg()['plugins']), 'плагины не продублировались');
+
+// RSS был выключен вручную — уважаем выбор, плагин не навязываем
+$writeCfg(['rss_enabled' => false, 'plugins' => [], 'social' => []]);
+Migrator::run($readCfg());
+$off = $readCfg();
+ok(!in_array('rss', (array)$off['plugins'], true), 'выключенный RSS не включается обратно');
+ok(!in_array('social-links', (array)$off['plugins'], true), 'без заполненных соцсетей плагин не включается');
+
+// Свежая установка (current_build уже актуален) — миграции не гоняются
+$writeCfg(['current_build' => DEENO_VERSION, 'plugins' => [], 'rss_enabled' => true]);
+eq([], Migrator::run($readCfg()), 'на новой установке шагов нет');
+ok(!in_array('rss', (array)$readCfg()['plugins'], true), 'новая установка не трогается миграцией');
+
+// ────────────────────────────────────────────────────────────
 section('BackupManager — ZIP-бэкап');
 
+// Хранилище вынесено за пределы сайта (2026-07-30): по умолчанию класс уходит
+// в домашний каталог аккаунта. В тестах это создало бы мусор в реальном $HOME,
+// поэтому HOME на время подменяем несуществующим путём, а каталог задаём явно.
+$homeBefore = getenv('HOME');
+putenv('HOME=/nonexistent-deeno-test');
+$extBackups = sys_get_temp_dir() . '/deeno_bk_' . bin2hex(random_bytes(4));
+register_shutdown_function(function () use ($extBackups, $homeBefore) {
+    if (is_dir($extBackups)) {
+        foreach (glob($extBackups . '/*') ?: [] as $f) @unlink($f);
+        @rmdir($extBackups);
+    }
+    if ($homeBefore !== false) putenv('HOME=' . $homeBefore);
+});
+
 if (class_exists('ZipArchive')) {
-    $bk = new BackupManager();
+    $bk = new BackupManager(['backups_dir' => $extBackups]);
     $res = $bk->create();
     ok(!isset($res['error']), 'create() без ошибки');
     ok(count($bk->all()) >= 1, 'all(): созданный бэкап в списке');
+
+    // Архив с users/ и config.php не должен лежать в веб-корне
+    ok($bk->isOutsideWebRoot(), 'хранилище вынесено за пределы сайта');
+    ok(!str_starts_with($bk->dir(), ROOT_DIR . '/'), 'каталог архивов вне docroot');
+    ok(is_file(rtrim($bk->dir(), '/') . '/.htaccess'), 'рядом с архивами положен deny-.htaccess');
+    ok(is_file(rtrim($extBackups, '/') . '/' . ($res['file'] ?? 'нет')), 'файл создан именно в заданном каталоге');
+    ok(!is_file(ROOT_DIR . '/backups/' . ($res['file'] ?? 'нет')), 'в старом каталоге сайта архива нет');
 
     // Регресс (2026-07-30): имя бэкапа было предсказуемым — backup-ДАТА-ВРЕМЯ.zip.
     // На хостингах, где статику отдаёт nginx мимо Apache, .htaccess в /backups/
@@ -567,6 +634,35 @@ if (class_exists('ZipArchive')) {
     ok($bk->path($name) !== null, 'path(): новый файл со суффиксом скачивается');
     ok($bk->path('backup-2026-01-01-000000.zip') === null, 'path(): несуществующий файл → null');
     ok($bk->path('../config.php') === null, 'path(): выход за каталог отвергнут');
+
+    // Регресс (2026-07-30): каталог создавался в конструкторе, поэтому пустая
+    // папка появлялась в домашнем каталоге при КАЖДОМ заходе в админку (виджет
+    // «Последний бэкап» тоже создаёт объект) — даже у тех, кто бэкапы не делает.
+    $lazyDir = sys_get_temp_dir() . '/deeno_lazy_' . bin2hex(random_bytes(4));
+    $lazy    = new BackupManager(['backups_dir' => $lazyDir]);
+    eq(rtrim($lazyDir, '/') . '/', $lazy->dir(), 'каталог выбран из настройки');
+    ok(!is_dir($lazyDir), 'создание объекта не создаёт каталог на диске');
+    ok(count($lazy->all()) === 0, 'all() на несуществующем каталоге не падает');
+    ok($lazy->path('backup-2020-01-01-000000.zip') === null, 'path() на несуществующем каталоге не падает');
+
+    // Архивы, созданные до переезда, остаются видимыми и скачиваемыми
+    @mkdir(ROOT_DIR . '/backups', 0755, true);
+    $old = 'backup-2020-01-02-030405.zip';
+    file_put_contents(ROOT_DIR . '/backups/' . $old, 'legacy-zip');
+    $names = array_column((new BackupManager(['backups_dir' => $extBackups]))->all(), 'name');
+    ok(in_array($old, $names, true), 'старый архив из /backups/ виден в списке');
+    ok((new BackupManager(['backups_dir' => $extBackups]))->path($old) !== null,
+        'старый архив скачивается после переезда хранилища');
+
+    // Кандидат внутри сайта отвергается: иначе архив снова оказался бы в вебе.
+    // Путь намеренно НЕ совпадает с фоллбэком (/backups/), иначе проверка была бы
+    // бесполезной — она проходила бы и со снятой защитой. HOME подменён
+    // несуществующим, маркера /public_html/ в пути песочницы нет, поэтому
+    // единственный оставшийся вариант — фоллбэк внутрь сайта.
+    $inside = new BackupManager(['backups_dir' => ROOT_DIR . '/content/sneaky-backups']);
+    eq(ROOT_DIR . '/backups/', $inside->dir(), 'путь внутри сайта отвергнут → фоллбэк на /backups/');
+    ok(!is_dir(ROOT_DIR . '/content/sneaky-backups'), 'отвергнутый каталог даже не создаётся');
+    ok(!$inside->isOutsideWebRoot(), 'фоллбэк честно сообщает, что хранилище в вебе');
 } else {
     echo "  (расширение zip не установлено — BackupManager пропущен)\n";
 }

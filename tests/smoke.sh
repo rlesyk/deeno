@@ -53,10 +53,15 @@ rm -f "$TMP/install.php"   # чтобы не редиректило в маст�
 
 GUARD="<?php http_response_code(403); exit('UL CMS'); ?>"
 
+# Версия данных: без неё Migrator посчитает конфиг «старым», выполнит миграции
+# и перепишет config.php в pretty-print — sed-подстановки ниже перестанут
+# совпадать. Smoke проверяет ТЕКУЩУЮ версию, сценарий обновления — в managers.php.
+VER="$(php -r 'require "'"$ROOT"'/system/version.php"; echo DEENO_VERSION;')"
+
 # ── 2. Конфиг ──
 cat > "$TMP/config.php" <<EOF
 $GUARD
-{"site_title":"Smoke","site_url":"$BASE","theme":"default","language":"ru","timezone":"UTC","posts_per_page":10,"cache_enabled":false,"maintenance_mode":false,"sitemap_enabled":true,"plugins":["rss","social-links"]}
+{"site_title":"Smoke","site_url":"$BASE","theme":"default","language":"ru","timezone":"UTC","posts_per_page":10,"cache_enabled":false,"maintenance_mode":false,"sitemap_enabled":true,"current_build":"$VER","plugins":["rss","social-links"]}
 EOF
 
 # ── 3. Админ (пароль smoke12345) ──

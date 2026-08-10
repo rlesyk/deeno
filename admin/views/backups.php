@@ -3,7 +3,8 @@ declare(strict_types=1);
 defined('FFC_ADMIN') or exit;
 
 /** @var array $backupsList  @var bool $backupOk  @var bool $backupDeleted  @var string $backupErr
- *  @var string $adminBase  @var Security $security */
+ *  @var string $adminBase  @var Security $security
+ *  @var string $backupsDir  @var bool $backupsSafe */
 ?>
 
 <?php if (!empty($backupOk)): ?>
@@ -20,6 +21,15 @@ defined('FFC_ADMIN') or exit;
     <button type="submit" class="btn btn--primary"><?= icon('plus') ?><?= e(t('Бэкап')) ?></button>
   </form>
 </div>
+
+<?php /* Где лежат архивы. В них users/ и config.php, поэтому по умолчанию
+         хранилище вынесено за пределы сайта — здесь это видно. */ ?>
+<p class="muted" style="margin:-4px 0 16px;font-size:13px;overflow-wrap:anywhere">
+  <?= e(t('Хранилище:')) ?> <code style="overflow-wrap:anywhere;white-space:normal"><?= e($backupsDir) ?></code>
+  <?php if (!$backupsSafe): ?>
+    — <?= e(t('внутри сайта; надёжнее вынести за его пределы (см. документацию)')) ?>
+  <?php endif; ?>
+</p>
 
 <div class="card">
 <?php if (empty($backupsList)): ?>

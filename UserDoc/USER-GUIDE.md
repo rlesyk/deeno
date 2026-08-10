@@ -322,20 +322,38 @@ is updated separately (see [README → Updating](../README.md#updating)).
 Download the archive with the "Download" button — it isn't stored anywhere except your
 server (and your computer after downloading).
 
+**Where the archives live.** An archive contains `users/` and `config.php`, so deeno
+keeps them **outside the site folder** — in your hosting account's home directory
+(`~/deeno-backups-xxxxxxxx/`), where the web server can't reach them. The exact path is
+shown above the list on the Backups page. If that isn't possible (no writable directory
+above the site), deeno falls back to `/backups/` inside the site and says so on the same
+line; the file name then carries a random suffix so the URL can't be guessed. You can
+also set the location yourself with `"backups_dir": "/absolute/path"` in `config.php`.
+Archives created before this change stay visible and downloadable.
+
 ### Manual restore
 
 There's no ready "Restore" button in the interface — if something goes wrong, restore
 over FTP/SFTP:
 
-1. Unpack the downloaded `backup-YYYY-MM-DD-HHMMSS.zip` locally.
-2. Upload onto the server over the current files, replacing the contents of: `content/`,
-   `media/`, `users/`, `themes/`, `config.php`, `system/categories.php`,
-   `system/redirects.json` (the last two are in the archive only if they existed at
-   backup time).
+1. Unpack the downloaded `backup-YYYY-MM-DD-HHMMSS-xxxxxxxxxxxx.zip` locally.
+2. Upload onto the server over the current files, replacing the contents of: `content/`
+   (posts, pages and their revision history), `media/`, `users/`, `themes/`,
+   `config.php`, `system/categories.php`, `system/redirects.json`,
+   `system/plugin-data.php` (the three `system/` files are in the archive only if
+   they existed at backup time).
 3. The backup doesn't touch the CMS code (`system/*.php`, `admin/`, `index.php`) — you
    don't need to touch it either, only the items above.
 4. Clear `/cache/` (just delete everything inside — it rebuilds itself the next time the
    site is opened).
+
+### After updating deeno itself
+
+Replacing the code files is enough — see [README → Updating](../README.md#updating).
+The first time you open the admin panel afterwards, deeno checks the data version
+recorded in `config.php` and applies any pending migrations on its own (a toast
+tells you when it did). That's how, for example, the 1.0 → 1.1 update keeps your
+RSS feed and social links working after they moved into plugins.
 
 ## Settings
 

@@ -386,5 +386,8 @@
   "Демо-режим — это песочница, данные сбрасываются ежедневно. Изменяющие действия отключены.": "Demo mode — this is a sandbox, data is reset daily. Modifying actions are disabled.",
   "Демо-доступ": "Demo access",
   "Песочница сбрасывается ежедневно, часть действий отключена.": "The sandbox is reset daily; some actions are disabled.",
-  "Sitemap": "Sitemap"
+  "Sitemap": "Sitemap",
+  "Хранилище:": "Stored in:",
+  "внутри сайта; надёжнее вынести за его пределы (см. документацию)": "inside the site; moving it outside the web root is safer (see the docs)",
+  "Данные обновлены до версии %s.": "Data updated to version %s."
 }

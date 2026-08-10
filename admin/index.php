@@ -517,6 +517,19 @@ if ($user === null) {
     adminRedirect($adminBase);
 }
 
+// Миграции данных после обновления кода. Выполняются молча при первом входе;
+// в конфиг пишется current_build, поэтому дальше проверка стоит один
+// version_compare. Демо-режим не трогаем — там конфиг менять нельзя.
+$migrated = [];
+if (!isDemoMode()) {
+    $migrated = Migrator::run($config);
+    if ($migrated !== []) {
+        // Дальше по запросу нужен уже обновлённый конфиг (например, список плагинов)
+        [$fresh] = DataFile::readWithLegacy(ROOT_DIR . '/config');
+        if (is_array($fresh)) $config = $fresh;
+    }
+}
+
 // ----------------------------------------------------------------
 // Демо-режим: единая точка отказа для изменяющих действий (сервер, не UI).
 // Максимальная защита публичной песочницы от злоупотреблений:
@@ -575,6 +588,7 @@ $common    = [
     'adminLang' => $adminLang,
     'adminTheme' => $adminTheme,
     'demoMode'  => isDemoMode(),
+    'migrated'  => $migrated,
 ];
 
 // Джамп-бар (⌘K): контент + быстрые действия с учётом роли; счётчики для сайдбара.
@@ -721,7 +735,7 @@ if ($action === 'dashboard') {
         if ($b >= 1048576)    return number_format($b / 1048576, 1, '.', ' ') . ' ' . t('МБ');
         return number_format(max(0, $b) / 1024, 0, '.', ' ') . ' ' . t('КБ');
     };
-    $lastBackup = (new BackupManager())->all()[0]['mtime'] ?? null;
+    $lastBackup = (new BackupManager($config))->all()[0]['mtime'] ?? null;
     $backupDays = $lastBackup !== null ? (int)floor((time() - (int)$lastBackup) / 86400) : null;
 
     // «Свободно на диске» убрано (2026-07-20): disk_free_space() показывает
@@ -1344,7 +1358,7 @@ if ($action === 'users') {
 if ($action === 'backups') {
     requireRole(['admin'], $user);
 
-    $backups = new BackupManager();
+    $backups = new BackupManager($config);
 
     if ($sub === 'create' && $isPost) {
         if (!$security->verifyCsrf($_POST['csrf'] ?? null)) {
@@ -1380,6 +1394,8 @@ if ($action === 'backups') {
     adminRender('backups', $common + [
         'title'         => t('Бэкапы'),
         'backupsList'   => $backups->all(),
+        'backupsDir'    => $backups->dir(),
+        'backupsSafe'   => $backups->isOutsideWebRoot(),
         'backupOk'      => isset($_GET['backup_ok']),
         'backupDeleted' => isset($_GET['backup_deleted']),
         'backupErr'     => (string)($_GET['backup_err'] ?? ''),

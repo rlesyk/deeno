@@ -3,6 +3,29 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Data migrations between versions.** deeno now records the data version in
+  `config.php` (`current_build`) and, on the first admin login after the files
+  are updated, quietly brings the installation up to date — a toast confirms it
+  when something was applied. The 1.0 → 1.1 step enables the RSS and Social
+  links plugins if you were using those features (so the feed and the icons
+  don't silently disappear) and restores the protective `.htaccess` files.
+  Upgrading no longer needs manual steps from the release notes.
+
+### Security
+
+- **Backups are stored outside the site folder now.** An archive contains `users/`
+  and `config.php`, and on hosts where nginx serves static files directly the
+  `.htaccess` deny rules never apply to `.zip` — so a copy inside the web root was
+  reachable by URL. deeno now writes archives to the hosting account's home
+  directory (`~/deeno-backups-xxxxxxxx/`), falls back to `/backups/` only when
+  nothing above the site is writable, and lets you pin the location with
+  `"backups_dir"` in `config.php`. The Backups page shows where they are kept.
+  Archives created earlier remain listed and downloadable.
+
 ## [1.1.0] — 2026-07-30
 
 ### Added

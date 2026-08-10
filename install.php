@@ -275,6 +275,9 @@ function performInstall(array $site, array $admin): ?string
         'language'         => $site['language'],
         'timezone'         => $site['timezone'],
         'installed'        => true,
+        // Новая установка уже соответствует текущей версии — миграции при
+        // первом входе в админку гонять незачем (см. system/Migrator.php).
+        'current_build'    => defined('DEENO_VERSION') ? DEENO_VERSION : '',
     ]);
 
     // Конфиг — guard-файл: закрыт снаружи даже без deny-правил сервера

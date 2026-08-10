@@ -130,6 +130,11 @@ $uiTheme = ($adminTheme ?? 'light') === 'dark' ? 'dark' : 'light';
   </div>
 </div>
 
+<?php if (!empty($migrated)): ?>
+  <?php /* Миграции данных после обновления кода — сообщаем, что всё прошло */ ?>
+  <div class="alert alert--success" data-toast><?= e(sprintf(t('Данные обновлены до версии %s.'), (string)end($migrated))) ?></div>
+<?php endif; ?>
+
 <?php if (isset($_GET['demo'])): ?>
   <div class="alert alert--danger" data-toast><?= e(t('В демо-режиме это действие отключено.')) ?></div>
 <?php endif; ?>

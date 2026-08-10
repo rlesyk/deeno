@@ -36,6 +36,29 @@ locked inside a database you can't reach.
 
 That's it. The wizard checks everything for you and cleans up after itself.
 
+## Updating
+
+Replace the code, keep your data:
+
+- **Overwrite:** `index.php`, `admin/`, `system/`, `themes/`, `plugins/` — except
+  the runtime files listed below, which live inside those folders
+- **Leave alone:** `config.php`, `users/`, `content/` (posts, pages and their
+  revision history), `media/`, `cache/`, `backups/`, `system/secret.key`,
+  `system/security-data.php`, `system/security.json`, `system/categories.php`,
+  `system/redirects.json`, `system/plugin-data.php`, `system/logs/`,
+  `system/sessions/`
+
+Overwriting any of those loses real data: `plugin-data.php` holds every plugin's
+settings, `categories.php` your category names, `redirects.json` the 301s created
+when an address changed.
+
+Then open the admin panel once. deeno compares the data version stored in
+`config.php` with the code version and applies any pending migrations itself —
+you'll see a toast when it does. Nothing else is required; the release notes
+will say so explicitly if a release ever needs a manual step.
+
+Back up before updating: **Backups → Create backup**.
+
 ## Screenshots
 
 <p align="center">
