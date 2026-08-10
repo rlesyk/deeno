@@ -190,6 +190,12 @@ $cms->pages()                           // All static pages
 $cms->related($post, 3)                 // Related posts (by tags)
 ```
 
+> **Which posts a theme sees.** Every call above returns only publicly visible
+> material — `published` and `sticky`. Drafts, scheduled posts, `unlisted` ones
+> (reachable by direct link only) and **archived** ones never reach a template, so a
+> theme doesn't have to filter by `$post->status` itself. The engine answers 404 for
+> anything not public before a template is even chosen.
+
 ### `CategoryManager` — human-readable category names
 
 A category slug (`$post->category`, the keys of `$cms->categories()`, `$category` in

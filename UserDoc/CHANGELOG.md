@@ -7,6 +7,11 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`post.saved` now always carries `type`.** Saving a *post* used to omit the key
+  (only pages and restores had it), so a plugin couldn't tell posts from pages
+  without guessing. The event also fires for archiving, revision restores
+  (`restored` holds the revision id) and category renames — see
+  [PLUGINS.md](PLUGINS.md).
 - **Archiving posts.** A new **"Archived"** status for outdated material you don't
   want to delete: the post disappears from feeds, categories, tags, search, RSS and
   the sitemap, and its URL returns 404 — while the file, its media and its revision
@@ -31,6 +36,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   links plugins if you were using those features (so the feed and the icons
   don't silently disappear) and restores the protective `.htaccess` files.
   Upgrading no longer needs manual steps from the release notes.
+
+### Fixed
+
+- **PLUGINS.md documented the wrong payload for `post.saved`** — it promised a
+  `filename` key that the event never sent (the real one is `file`), so the ping
+  example copied from the docs silently did nothing. The reference now matches the
+  code, and a test pins the contract.
 
 ### Security
 

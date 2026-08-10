@@ -116,15 +116,22 @@ The listener receives a payload and returns nothing.
 
 | Event | Payload | When |
 |---|---|---|
-| `post.saved` | `['filename' => ..., 'type' => post\|page]` | After saving from the admin |
-| `post.deleted` | `['file' => ..., 'type' => ...]` | After deletion |
+| `post.saved` | `['file' => 'name.md', 'meta' => [...], 'new' => bool, 'type' => 'post'\|'page']` | After saving from the admin |
+| `post.deleted` | `['file' => 'name.md', 'type' => 'post'\|'page']` | After deletion |
 | `media.uploaded` | `['url' => ..., 'path' => ...]` | After a file is uploaded |
 
-Example — ping a search engine on publish:
+`post.saved` fires on every write to a material, not only on the editor's Save button:
+archiving, restoring a revision (the payload then also carries `'restored' => '<revision
+id>'`) and a category rename all go through it. `meta` is the frontmatter as it was
+written to the file, so `$p['meta']['status']` tells you whether the material is public.
+`new` is `true` only for the very first save of a material.
+
+Example — ping a search engine when a post is published:
 
 ```php
 Hooks::add('post.saved', function (array $p): void {
-    @file_get_contents('https://example.com/ping?updated=' . urlencode($p['filename']));
+    if (($p['meta']['status'] ?? '') !== 'published') return;   // drafts don't concern us
+    @file_get_contents('https://example.com/ping?updated=' . urlencode($p['file']));
 });
 ```
 

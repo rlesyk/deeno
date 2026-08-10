@@ -192,7 +192,7 @@ class PostController
             return ['error' => Lang::t('Не удалось записать файл поста (права на /content/posts/?).')];
         }
 
-        Hooks::run('post.saved', ['file' => $filename, 'meta' => $meta, 'new' => $isNew]);
+        Hooks::run('post.saved', ['file' => $filename, 'meta' => $meta, 'new' => $isNew, 'type' => 'post']);
 
         return ['filename' => $filename];
     }

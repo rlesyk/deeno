@@ -1074,6 +1074,37 @@ eq('draft', $back?->status, 'возврат из архива даёт черн�
 ok(str_contains((string)file_get_contents($cmsArc->postsDir() . 'arhivnyy.md'), 'Тело архивной статьи.'), 'тело материала при смене статуса сохранено');
 
 // ────────────────────────────────────────────────────────────
+section('Хук post.saved — состав данных (контракт для плагинов)');
+
+// В PLUGINS.md обещаны ключи file/meta/new/type. Раньше дока обещала 'filename',
+// которого в payload нет, и пример из неё молча ничего не делал.
+$captured = [];
+Hooks::add('post.saved', function (array $p) use (&$captured): void { $captured[] = $p; });
+
+$pcHook = new PostController($cms, new Security($cfg), $cfg);
+$hookNew = $pcHook->save(['type' => 'post', 'title' => 'Хук новый', 'status' => 'draft', 'content' => 'x'], $admin);
+$last = end($captured) ?: [];
+ok(isset($last['file']) && $last['file'] === $hookNew['filename'], 'post.saved: ключ file = имя файла');
+ok(isset($last['meta']['status']), 'post.saved: meta содержит записанную шапку');
+eq(true, $last['new'] ?? null, 'post.saved: new = true при первом сохранении');
+eq('post', $last['type'] ?? null, 'post.saved: type = post');
+
+$pcHook->save(['type' => 'post', 'file' => $hookNew['filename'], 'title' => 'Хук новый', 'status' => 'draft', 'content' => 'y'], $admin);
+eq(false, (end($captured) ?: [])['new'] ?? null, 'post.saved: new = false при повторном сохранении');
+
+$hookPage = $pcHook->save(['type' => 'page', 'title' => 'Хук страница', 'status' => 'draft', 'content' => 'x'], $admin);
+eq('page', (end($captured) ?: [])['type'] ?? null, 'post.saved: type = page для страницы');
+
+// Восстановление версии тоже проходит через хук и помечается id версии
+$hookRevs = $pcHook->revisions()->all('post', $hookNew['filename']);
+if ($hookRevs !== []) {
+    $pcHook->restore('post', $hookNew['filename'], $hookRevs[0]['id'], $admin);
+    ok(isset((end($captured) ?: [])['restored']), 'post.saved: при откате есть ключ restored');
+} else {
+    ok(false, 'фикстура: у поста должна быть версия для отката');
+}
+
+// ────────────────────────────────────────────────────────────
 echo "\n";
 if ($GLOBALS['__f'] === 0) {
     echo "\033[32mManagers: все {$GLOBALS['__t']} проверок прошли ✓\033[0m\n";

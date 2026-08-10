@@ -131,7 +131,7 @@ class CategoryController
                 }
             }
 
-            Hooks::run('post.saved', ['file' => basename($path), 'meta' => $meta, 'new' => false]);
+            Hooks::run('post.saved', ['file' => basename($path), 'meta' => $meta, 'new' => false, 'type' => 'post']);
         }
     }
 }
