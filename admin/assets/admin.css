@@ -1595,12 +1595,21 @@ body.is-locked {
 .plugin-item__desc { margin: 3px 0 0; font-size: 13px; line-height: 1.5; color: var(--steel); }
 .plugin-item__author { margin: 3px 0 0; font-size: 12px; color: var(--fog); }
 .plugin-item__actions { display: flex; align-items: center; gap: 8px; flex: none; }
-/* Кнопка удаления — квадратная, тихая, краснеет на ховере (как в темах) */
+/* Кнопки-иконки в ряду действий — квадратные и тихие (как в темах):
+   рамка как у полей, иконка --fog; цвет приходит на ховере — настройки
+   синеют, удаление краснеет. Оба варианта одного размера, иначе ряд
+   с тумблером выглядит собранным из разных наборов. */
+.plugin-item__actions .btn--secondary,
 .plugin-item__actions .btn--danger {
   background: var(--paper);
   border-color: var(--hairline-strong);
   color: var(--fog);
   padding: 6px;
+}
+.plugin-item__actions .btn--secondary:not(:disabled):hover {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
 }
 .plugin-item__actions .btn--danger:not(:disabled):hover {
   background: var(--ember-soft);
